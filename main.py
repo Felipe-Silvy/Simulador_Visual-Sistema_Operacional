@@ -1,6 +1,6 @@
 import sys
 from leitor import LeitorConfiguracao
-#from simulador import Simulador
+from simulador import Simulador
 
 def main(): 
     caminho = input("Digite o caminho do arquivo de configuração: ")
@@ -13,9 +13,9 @@ def main():
             print(erro)
         return          # MOSTRAR AO USUÁRIO POSTERIORMENTE NA INTERFACE
 
-    # simulador = Simulador( cpus=configuracao.num_cpus, tarefas=configuracao.tarefas, escalonador=configuracao.escalonador, )
+    simulador = Simulador( cpus=configuracao.num_cpus, tarefas=configuracao.tarefas, escalonador=configuracao.escalonador, )
 
-    #simulador.executar()
+    simulador.executar()
 
 if __name__ == "__main__":
     main()
