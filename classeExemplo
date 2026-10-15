@@ -1,36 +1,5 @@
-class Pessoa:
-    # Atributo de classe (compartilhado por todas as instâncias)
-    especie = "Humano"
-
-    # Construtor: executado ao criar um objeto
-    def __init__(self, nome, idade):
-        # Atributos de instância
-        self.nome = nome
-        self.idade = idade
-
-    # Método de instância
-    def apresentar(self):
-        return f"Olá, eu sou {self.nome} e tenho {self.idade} anos"
-
-    # Representação em texto do objeto (opcional, mas útil)
-    def __str__(self):
-        return f"Pessoa({self.nome}, {self.idade})"
-
-
-
-class Aluno(Pessoa):                 # Herança
-    def __init__(self, nome, idade, curso):
-        super().__init__(nome, idade)  # Chama o construtor da classe pai
-        self.curso = curso
-
-    @property                          # Acessa o método como se fosse atributo
-    def descricao(self):
-        return f"{self.nome} estuda {self.curso}"
-
-    @classmethod                       # Recebe a classe (cls), não a instância
-    def criar_anonimo(cls):
-        return cls("Anônimo", 0, "Nenhum")
-
-    @staticmethod                      # Não recebe self nem cls
-    def maior_de_idade(idade):
-        return idade >= 18
+rm;1;1;
+1;FF0000;0;2;5;5
+2;00ff00;0;3;8;8;
+ 
+3;0000FF;0;1;0;4

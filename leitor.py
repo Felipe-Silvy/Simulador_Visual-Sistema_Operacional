@@ -28,6 +28,7 @@ class LeitorConfiguracao:
             
             # A primeira linha é o cabeçalho, as demais são tarefas [req. 3.3.1]
             self._ler_cabecalho(linhas[0])
+
             for linha in linhas[1:]:
                 self._ler_tarefa(linha)
 

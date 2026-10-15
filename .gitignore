@@ -1,0 +1,16 @@
+# Arquivos e pastas de cache do Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ambiente virtual (se você usar)
+venv/
+env/
+ENV/
+
+# Arquivos gerados pelo VS Code
+.vscode/
+
+# Arquivos de sistema operacional
+.DS_Store
+Thumbs.db
