@@ -1,3 +1,5 @@
+import random
+
 class EscalonadorStrategy:
     nome_politica = "BASE"
 
@@ -7,8 +9,17 @@ class EscalonadorStrategy:
 
     def selecionar(self, candidatas, num_cpus, tempo):
         # Ordena da mais prioritária para a menos e devolve as 'num_cpus' primeiras
-        ordenadas = sorted(candidatas, key=self._chave_completa)
-        return ordenadas[:num_cpus]
+        ordenadas = sorted(candidatas, key=lambda t: (self._chave_completa(t), random.random()))
+
+        escolhidas = ordenadas[:num_cpus]
+        sorteadas = []
+        if len(ordenadas) > num_cpus:
+            chave_corte = self._chave_completa(ordenadas[num_cpus - 1])
+            if chave_corte == self._chave_completa(ordenadas[num_cpus]):
+                # o corte caiu no meio de um empate: as escolhidas empatadas venceram no sorteio
+                sorteadas = [t for t in escolhidas if self._chave_completa(t) == chave_corte]
+
+        return escolhidas, sorteadas
 
     def _chave_completa(self, tcb):
         # Critério principal do algoritmo + desempates do req. 4.3, nesta ordem

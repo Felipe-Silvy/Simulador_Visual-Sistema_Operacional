@@ -19,8 +19,8 @@ class Simulador:
 
     def tick(self):
         self._ativar_tarefas()                 # passo 1: 
-        escolhidas = self._escolher()          # passo 3: pergunta ao escalonador
-        self._aplicar_decisao(escolhidas)      # passo 4: preempção e distribuição nas CPUs
+        escolhidas, sorteadas = self._escolher()          # passo 3: pergunta ao escalonador
+        self._aplicar_decisao(escolhidas, sorteadas)      # passo 4: preempção e distribuição nas CPUs
         self._executar_tick()                  # passo 5: consome 1 tick e conclui instâncias
         
         # 2. Avança o relógio (sempre por último, para o tick atual usar o valor atual)
@@ -53,7 +53,7 @@ class Simulador:
         candidatas = self.fila_prontos + em_execucao
         return self.escalonador.selecionar(candidatas, len(self.processadores), self.relogio)
 
-    def _aplicar_decisao(self, escolhidas):
+    def _aplicar_decisao(self, escolhidas, sorteadas):
         # Preempção: quem está numa CPU mas NÃO foi escolhido perde a vaga
         for cpu in self.processadores:
             if cpu.tarefa_atual is not None and cpu.tarefa_atual not in escolhidas:
@@ -75,6 +75,9 @@ class Simulador:
                     self.fila_prontos.remove(task)
                 else:
                     cpu.desligar()
+            # Sorteadas que ficaram numa CPU: tanto as que acabaram de entrar quanto as que já estavam
+            if cpu.tarefa_atual in sorteadas:
+                    cpu.tarefa_atual.adicionar_evento("SORTEIO", self.relogio, self.relogio, cpu.id)
 
     def _executar_tick(self):
         for cpu in self.processadores:
