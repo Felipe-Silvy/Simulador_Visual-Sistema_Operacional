@@ -1,4 +1,6 @@
 from processador import Processador
+from snapshot import SnapshotSimulacao
+from historico import HistoricoSimulacao
 
 class Simulador:
     def __init__(self, num_cpus, tarefas, escalonador):
@@ -9,25 +11,58 @@ class Simulador:
 
         self.relogio = 0   # relógio global (ticks)
 
-    def adicionar_tarefa(self, tcb):
-        self.tarefas.append(tcb)
+        # Inicializa o gestor do Padrão Memento (Histórico)
+        self.historico = HistoricoSimulacao()
+        # Salva o estado inicial (tick 0)
+        self._salvar_snapshot()
 
     def executar(self):
         limite = 1000 # Para evitar laços infinitos
-        while self.relogio < limite and any(task.estado != "TERMINADA" for task in self.tarefas):
-            self.tick()
+        while self.relogio < limite and self.avancar():
+            pass
 
+        # aqui chamar o gerador de imagem gantt sla o nome
+
+    def avancar(self):
+            snap = self.historico.refazer()          # há futuro já calculado?
+            if snap:
+                self.restaurar_estado(snap)
+                return True
+            if self._terminou():
+                return False
+            self.tick()                              # o tick() já salva o snapshot
+            return True
+
+    def restaurar_estado(self, snapshot):
+        if snapshot:
+            self.relogio = snapshot.relogio
+            self.processadores, self.tarefas, self.fila_prontos = snapshot.copiar_estado()
+
+    def _terminou(self):
+            return all(t.estado == "TERMINADA" for t in self.tarefas)
+
+    """""
+    Adicionar se o usuário puder adicionar tarefas durante a execução
+    def adicionar_tarefa(self, tcb):
+            self.tarefas.append(tcb)
+            self.historico.invalidar_futuro_por_edicao()
+            self.historico.substituir_atual(SnapshotSimulacao(
+            self.relogio, self.processadores, self.tarefas, self.fila_prontos))
+    """
     def tick(self):
-        self._ativar_tarefas()                 # passo 1: 
-        escolhidas, sorteadas = self._escolher()          # passo 3: pergunta ao escalonador
-        self._aplicar_decisao(escolhidas, sorteadas)      # passo 4: preempção e distribuição nas CPUs
-        self._executar_tick()                  # passo 5: consome 1 tick e conclui instâncias
+        self._ativar_tarefas()                 
+        escolhidas, sorteadas = self._escolher()          # pergunta ao escalonador
+        self._aplicar_decisao(escolhidas, sorteadas)      # preempção e distribuição nas CPUs
+        self._executar_tick()                             # consome 1 tick e conclui instâncias
         
-        # 2. Avança o relógio (sempre por último, para o tick atual usar o valor atual)
+        # Avança o relógio 
         self.relogio += 1  # Modificar depois, avançar apenas quando o usuário clilcar na seta de avançar
 
+        # Salva o novo estado gerado no histórico
+        self._salvar_snapshot()
+        
     def _ativar_tarefas(self):
-    # 1. Ativar tarefas cujo período começa neste instante
+    # Ativar tarefas cujo período começa neste instante
             for tcb in self.tarefas:
                 if self._deve_ativar(tcb):
                     if tcb.estado in ("PRONTA", "EXECUTANDO"):
@@ -97,3 +132,38 @@ class Simulador:
                 tcb.adicionar_evento("FIM", self.relogio + 1, self.relogio + 1)
                 cpu.desalocar_tarefa()
                 tcb.concluir_execucao()
+
+    def _salvar_snapshot(self):
+            snapshot = SnapshotSimulacao(
+                relogio=self.relogio,
+                processadores=self.processadores,
+                tarefas=self.tarefas,
+                fila_prontos=self.fila_prontos
+            )
+            self.historico.salvar(snapshot)
+
+    def modificar_tarefa_retroativa(self, tarefa_id, novas_propriedades):
+        tcb = next((t for t in self.tarefas if t.id == tarefa_id), None)
+        if tcb is None:
+            return False
+
+        # valida ANTES de alterar: a edição é tudo ou nada
+        if not novas_propriedades or any(not hasattr(tcb, chave) for chave in novas_propriedades):
+            return False
+
+        for chave, valor in novas_propriedades.items():
+            setattr(tcb, chave, valor)
+
+        self.historico.invalidar_futuro_por_edicao()
+        self.historico.substituir_atual(SnapshotSimulacao(
+            self.relogio, self.processadores, self.tarefas, self.fila_prontos))
+        return True
+
+    def retroceder(self):
+        snap = self.historico.desfazer()
+        if snap is None:
+            return False
+        self.restaurar_estado(snap)
+        return True
+
+    
