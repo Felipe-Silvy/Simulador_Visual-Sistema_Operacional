@@ -3,11 +3,9 @@ from tkinter import filedialog, messagebox, ttk
 
 
 class GerenciadorGrafico:
-    """Gerenciador gráfico completo do Simulador de SO.
+    """Gerenciador gráfico do Simulador de SO.
 
-    Gerencia a janela do Dashboard, renderização do Gráfico de Gantt
-    (com marcadores de eventos), Tabela TCB com edição passo a passo,
-    controle de animação (Play/Pausa), legenda de cores e exportação SVG.
+    Totalmente compatível com as estruturas de Task e Engine do projeto.
     """
 
     def __init__(
@@ -17,7 +15,7 @@ class GerenciadorGrafico:
         self.root.title(titulo)
         self.root.geometry(f"{largura}x{altura}")
 
-        # Callbacks de comunicação desacoplada com o Motor
+        # Callbacks para o Controller (main.py / engine.py)
         self.on_carregar_ficheiro = None
         self.on_avancar = None
         self.on_retroceder = None
@@ -25,23 +23,22 @@ class GerenciadorGrafico:
 
         # Controle de Animação (Play / Pausa)
         self.em_execucao = False
-        self.delay_ms = 500  # Velocidade padrao (ms por tick)
+        self.delay_ms = 500
 
-        # Guardar último estado para exportação e edição
+        # Guardar referência do último estado recebido
         self.ultimo_estado = None
 
         self._setup_layout()
 
     # =======================================================
-    # CONSTRUÇÃO DA INTERFACE GRÁFICA
+    # ESTRUTURA VISUAL DA INTERFACE
     # =======================================================
     def _setup_layout(self):
-        """Cria os containers visuais, barras de navegação e componentes."""
-        # 1. Barra superior de Controles
+        """Cria os frames, botões de navegação, canvas e tabela TCB."""
+        # 1. Barra de Controles Superior
         self.frame_controles = tk.Frame(self.root, bg="#f0f0f0", height=50)
         self.frame_controles.pack(fill=tk.X, side=tk.TOP, padx=10, pady=5)
 
-        # Botões de navegação e arquivo
         self.btn_abrir = tk.Button(
             self.frame_controles,
             text="📁 Abrir Ficheiro",
@@ -83,7 +80,7 @@ class GerenciadorGrafico:
         )
         self.btn_exportar.pack(side=tk.LEFT, padx=10)
 
-        # Controle de Velocidade
+        # Controle de Velocidade da Animação
         lbl_vel = tk.Label(
             self.frame_controles, text="Velocidade:", bg="#f0f0f0"
         )
@@ -101,7 +98,7 @@ class GerenciadorGrafico:
         self.slider_velocidade.set(500)
         self.slider_velocidade.pack(side=tk.LEFT, padx=2)
 
-        # Label de Status (Tick, Algoritmo, CPUs)
+        # Painel Informativo (Tick, Algoritmo, CPUs)
         self.lbl_status = tk.Label(
             self.frame_controles,
             text="Tick: 0 | Algo: - | CPUs: -",
@@ -110,11 +107,10 @@ class GerenciadorGrafico:
         )
         self.lbl_status.pack(side=tk.RIGHT, padx=10)
 
-        # 2. Container Central Dividido (Gantt + Legenda)
+        # 2. Área Central (Gantt + Legenda Lateral)
         self.frame_corpo = tk.Frame(self.root, bg="white")
         self.frame_corpo.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
-        # Área do Gantt com Scrollbars
         self.frame_gantt = tk.Frame(self.frame_corpo, bg="white")
         self.frame_gantt.pack(
             side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5)
@@ -137,13 +133,12 @@ class GerenciadorGrafico:
         scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
         self.canvas_gantt.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        # Painel Lateral de Legenda de Cores
         self.frame_legenda = tk.LabelFrame(
             self.frame_corpo, text="Legenda", bg="#f9f9f9", width=120
         )
         self.frame_legenda.pack(side=tk.RIGHT, fill=tk.Y, padx=(5, 0))
 
-        # 3. Área Inferior para Tabela TCB
+        # 3. Tabela TCB Inferior
         self.frame_tcb = tk.Frame(self.root, height=150)
         self.frame_tcb.pack(fill=tk.X, side=tk.BOTTOM, padx=10, pady=5)
 
@@ -172,11 +167,10 @@ class GerenciadorGrafico:
             self.tabela_tcb.column(col, anchor="center")
         self.tabela_tcb.pack(fill=tk.X)
 
-        # Duplo clique na tabela para abrir a janela de edição
         self.tabela_tcb.bind("<Double-1>", self._on_double_click_tcb)
 
     # =======================================================
-    # AÇÕES E NAVEGAÇÃO
+    # NAVEGAÇÃO E AÇÕES
     # =======================================================
     def _acao_abrir_ficheiro(self):
         caminho = filedialog.askopenfilename(
@@ -201,7 +195,6 @@ class GerenciadorGrafico:
         self.delay_ms = int(val)
 
     def alternar_play_pausa(self):
-        """Alterna a execução automática contínua da simulação."""
         self.em_execucao = not self.em_execucao
         if self.em_execucao:
             self.btn_play.config(text="⏸ Pausa", bg="#f8d7da")
@@ -215,54 +208,57 @@ class GerenciadorGrafico:
             self.root.after(self.delay_ms, self._loop_animacao)
 
     # =======================================================
-    # RENDERIZAÇÃO E DESENHO DO GANTT
+    # ATUALIZAÇÃO VISUAL E DESENHO
     # =======================================================
     def renderizar_estado(self, estado_simulacao):
-        """Método principal chamado a cada tick para atualizar a tela inteira."""
+        """Atualiza a tela inteira com base no objeto de estado do Engine."""
         self.ultimo_estado = estado_simulacao
 
-        self.atualizar_status(
-            estado_simulacao.tick,
-            estado_simulacao.algoritmo,
-            estado_simulacao.cpus,
-        )
-        self.atualizar_tabela_tcb(estado_simulacao.tarefas)
-        self.atualizar_legenda(estado_simulacao.tarefas)
+        # Suporta tanto atributos em português quanto em inglês do Engine do projeto
+        tick = getattr(estado_simulacao, "tick", getattr(estado_simulacao, "current_tick", 0))
+        algoritmo = getattr(estado_simulacao, "algoritmo", getattr(estado_simulacao, "algo", "-"))
+        cpus = getattr(estado_simulacao, "cpus", getattr(estado_simulacao, "num_cpus", 1))
+        tarefas = getattr(estado_simulacao, "tarefas", getattr(estado_simulacao, "tasks", {}))
+        gantt_history = getattr(estado_simulacao, "gantt_history", getattr(estado_simulacao, "gantt_data", {}))
 
-        if hasattr(estado_simulacao, "gantt_history"):
-            self.desenhar_gantt(
-                estado_simulacao.gantt_history, estado_simulacao.tarefas
-            )
+        # Converte lista para dicionário se o motor enviar lista de tarefas
+        if isinstance(tarefas, list):
+            tarefas = {getattr(t, "id", f"T{i}"): t for i, t in enumerate(tarefas)}
+
+        self.atualizar_status(tick, algoritmo, cpus)
+        self.atualizar_tabela_tcb(tarefas)
+        self.atualizar_legenda(tarefas)
+        self.desenhar_gantt(gantt_history, tarefas)
 
     def atualizar_status(self, tick, algoritmo, cpus):
         self.lbl_status.config(
             text=f"Tick: {tick} | Algo: {algoritmo} | CPUs: {cpus}"
         )
 
-    def atualizar_tabela_tcb(self, tarefas):
+    def atualizar_tabela_tcb(self, tarefas: dict):
         for item in self.tabela_tcb.get_children():
             self.tabela_tcb.delete(item)
-        for t in tarefas.values():
+
+        for t_id, t in tarefas.items():
+            # Mapeamento dinâmico compatível com a classe Task do amigo
+            ingresso = getattr(t, "release_time", getattr(t, "entry_time", 0))
+            duracao = getattr(t, "burst", getattr(t, "duration", "-"))
+            periodo = getattr(t, "period", "-")
+            deadline = getattr(t, "relative_deadline", getattr(t, "deadline", "-"))
+            estado = getattr(t, "state", "READY")
+
             self.tabela_tcb.insert(
                 "",
                 tk.END,
-                values=(
-                    t.id,
-                    t.release_time,
-                    getattr(t, "duration", getattr(t, "burst", "-")),
-                    getattr(t, "period", "-"),
-                    getattr(t, "deadline", "-"),
-                    getattr(t, "state", "READY"),
-                ),
+                values=(t_id, ingresso, duracao, periodo, deadline, estado),
             )
 
-    def atualizar_legenda(self, tarefas):
-        """Desenha a lista de tarefas com suas respectivas cores no painel lateral."""
+    def atualizar_legenda(self, tarefas: dict):
         for widget in self.frame_legenda.winfo_children():
             widget.destroy()
 
         for t_id, task in tarefas.items():
-            cor = getattr(task, "color", "#888888")
+            cor = getattr(task, "color", "#2196F3")
             item_frame = tk.Frame(self.frame_legenda, bg="#f9f9f9")
             item_frame.pack(fill=tk.X, padx=5, pady=2)
 
@@ -272,19 +268,11 @@ class GerenciadorGrafico:
             box_cor.pack(side=tk.LEFT, padx=(0, 5))
 
             lbl_id = tk.Label(
-                item_frame,
-                text=t_id,
-                bg="#f9f9f9",
-                font=("Arial", 8, "bold"),
+                item_frame, text=t_id, bg="#f9f9f9", font=("Arial", 8, "bold")
             )
             lbl_id.pack(side=tk.LEFT)
 
     def desenhar_gantt(self, gantt_history: dict, tarefas: dict):
-        """Desenha o Gráfico de Gantt no Canvas com marcadores de eventos.
-
-        Eventos: Setas de Chegada (↑), Término (✓), CPU Ociosa e Perda de
-        Deadline (X).
-        """
         self.canvas_gantt.delete("all")
         if not tarefas:
             return
@@ -294,10 +282,10 @@ class GerenciadorGrafico:
         margin_x = 75
         margin_y = 45
 
-        # Requisito: IDs ordenados de forma DECRESCENTE no eixo Y
+        # Requisito: Ordem Decrescente no eixo Y
         sorted_task_ids = sorted(list(tarefas.keys()), reverse=True)
 
-        # 1. Rótulos do Eixo Y
+        # 1. Eixo Y
         for idx, task_id in enumerate(sorted_task_ids):
             y_pos = margin_y + (idx * cell_h)
             self.canvas_gantt.create_text(
@@ -307,13 +295,12 @@ class GerenciadorGrafico:
                 font=("Arial", 10, "bold"),
                 anchor="e",
             )
-
             max_grid_x = margin_x + (len(gantt_history) * cell_w) + 80
             self.canvas_gantt.create_line(
                 margin_x, y_pos + cell_h, max_grid_x, y_pos + cell_h, fill="#f0f0f0"
             )
 
-        # 2. Blocos de Execução e Marcadores
+        # 2. Histórico e Blocos do Gantt
         for tick, cpu_map in gantt_history.items():
             x0 = margin_x + (tick * cell_w)
             x1 = x0 + cell_w
@@ -327,25 +314,28 @@ class GerenciadorGrafico:
                 anchor="center",
             )
 
-            # Verifica quais tarefas foram alocadas
-            tarefas_executadas_no_tick = set()
+            # Processa o que executou em cada CPU
+            if isinstance(cpu_map, dict):
+                cpu_items = cpu_map.items()
+            elif isinstance(cpu_map, list):
+                cpu_items = enumerate(cpu_map)
+            else:
+                cpu_items = []
 
-            for cpu_id, task_id in cpu_map.items():
-                if task_id and task_id in sorted_task_ids:
-                    tarefas_executadas_no_tick.add(task_id)
-                    task = tarefas[task_id]
-                    y_idx = sorted_task_ids.index(task_id)
+            for cpu_id, task_id in cpu_items:
+                if task_id and str(task_id) in sorted_task_ids:
+                    task_key = str(task_id)
+                    task = tarefas[task_key]
+                    y_idx = sorted_task_ids.index(task_key)
                     y0 = margin_y + (y_idx * cell_h) + 3
                     y1 = y0 + cell_h - 6
 
-                    # Bloco principal de execução
                     cor = getattr(task, "color", "#2196F3")
                     self.canvas_gantt.create_rectangle(
                         x0, y0, x1, y1, fill=cor, outline="black"
                     )
 
-                    # ID da CPU dentro do bloco (se houver múltiplas)
-                    if len(cpu_map) > 1:
+                    if len(cpu_items) > 1:
                         self.canvas_gantt.create_text(
                             x0 + (cell_w / 2),
                             y0 + ((y1 - y0) / 2),
@@ -354,51 +344,30 @@ class GerenciadorGrafico:
                             font=("Arial", 7, "bold"),
                         )
 
-            # --- MARCADORES DE EVENTOS ---
+            # 3. Eventos Visuais (Ingresso, Deadline, Término)
             for task_id in sorted_task_ids:
                 task = tarefas[task_id]
                 y_idx = sorted_task_ids.index(task_id)
                 y0 = margin_y + (y_idx * cell_h) + 3
                 y1 = y0 + cell_h - 6
 
-                # Chegada / Ingresso (Seta para cima ↑)
-                release_time = getattr(task, "release_time", 0)
+                release_time = getattr(task, "release_time", getattr(task, "entry_time", 0))
                 if tick == release_time:
                     self.canvas_gantt.create_text(
-                        x0 + 4,
-                        y1 + 4,
-                        text="↑",
-                        fill="green",
-                        font=("Arial", 9, "bold"),
+                        x0 + 4, y1 + 4, text="↑", fill="green", font=("Arial", 9, "bold")
                     )
 
-                # Estouro de Deadline (Linha e X vermelho)
-                deadline = getattr(task, "deadline", None)
+                deadline = getattr(task, "relative_deadline", getattr(task, "deadline", None))
                 estourou_dl = getattr(task, "deadline_missed_tick", None)
                 if estourou_dl == tick or (
                     deadline and tick == deadline and getattr(task, "state", "") != "COMPLETED"
                 ):
-                    self.canvas_gantt.create_line(
-                        x1, y0 - 2, x1, y1 + 2, fill="red", width=2
-                    )
-                    self.canvas_gantt.create_text(
-                        x1,
-                        y0 - 8,
-                        text="✕",
-                        fill="red",
-                        font=("Arial", 10, "bold"),
-                    )
+                    self.canvas_gantt.create_line(x1, y0 - 2, x1, y1 + 2, fill="red", width=2)
+                    self.canvas_gantt.create_text(x1, y0 - 8, text="✕", fill="red", font=("Arial", 10, "bold"))
 
-                # Conclusão / Término (✓)
                 completed_tick = getattr(task, "completed_tick", None)
                 if completed_tick == tick:
-                    self.canvas_gantt.create_text(
-                        x1 - 4,
-                        y0 + 4,
-                        text="✓",
-                        fill="blue",
-                        font=("Arial", 8, "bold"),
-                    )
+                    self.canvas_gantt.create_text(x1 - 4, y0 + 4, text="✓", fill="blue", font=("Arial", 8, "bold"))
 
         max_x = margin_x + (len(gantt_history) * cell_w) + 100
         max_y = margin_y + (len(sorted_task_ids) * cell_h) + 50
@@ -416,7 +385,6 @@ class GerenciadorGrafico:
         self._abrir_janela_edicao_tarefa(task_id, val)
 
     def _abrir_janela_edicao_tarefa(self, task_id, val_atuais):
-        """Abre caixa de diálogo para alterar parâmetros de uma tarefa no passo a passo."""
         top = tk.Toplevel(self.root)
         top.title(f"Editar Tarefa - {task_id}")
         top.geometry("280x220")
@@ -427,7 +395,7 @@ class GerenciadorGrafico:
         frame_form = tk.Frame(top)
         frame_form.pack(pady=5, padx=10)
 
-        tk.Label(frame_form, text="Duração:").grid(row=0, column=0, sticky="e", pady=2)
+        tk.Label(frame_form, text="Duração (Burst):").grid(row=0, column=0, sticky="e", pady=2)
         ent_dur = tk.Entry(frame_form, width=10)
         ent_dur.insert(0, str(val_atuais[2]))
         ent_dur.grid(row=0, column=1, pady=2)
@@ -450,8 +418,10 @@ class GerenciadorGrafico:
         def salvar():
             try:
                 novos_dados = {
+                    "burst": int(ent_dur.get()),
                     "duration": int(ent_dur.get()),
                     "deadline": int(ent_dl.get()),
+                    "relative_deadline": int(ent_dl.get()),
                     "state": cb_estado.get(),
                 }
                 if self.on_editar_tarefa:
@@ -467,9 +437,15 @@ class GerenciadorGrafico:
     # EXPORTAÇÃO SVG NATIVA
     # =======================================================
     def _acao_exportar_svg(self):
-        if not self.ultimo_estado or not hasattr(self.ultimo_estado, "gantt_history"):
+        if not self.ultimo_estado:
             self.criar_mensagem_erro("Não há dados de simulação para exportar!")
             return
+
+        gantt_history = getattr(self.ultimo_estado, "gantt_history", getattr(self.ultimo_estado, "gantt_data", {}))
+        tarefas = getattr(self.ultimo_estado, "tarefas", getattr(self.ultimo_estado, "tasks", {}))
+
+        if isinstance(tarefas, list):
+            tarefas = {getattr(t, "id", f"T{i}"): t for i, t in enumerate(tarefas)}
 
         caminho = filedialog.asksaveasfilename(
             title="Salvar Gráfico de Gantt como SVG",
@@ -477,16 +453,11 @@ class GerenciadorGrafico:
             filetypes=[("Arquivo SVG", "*.svg")],
         )
         if caminho:
-            self.exportar_gantt_svg(
-                self.ultimo_estado.gantt_history,
-                self.ultimo_estado.tarefas,
-                caminho,
-            )
+            self.exportar_gantt_svg(gantt_history, tarefas, caminho)
 
     def exportar_gantt_svg(
         self, gantt_history: dict, tarefas: dict, caminho_arquivo: str
     ):
-        """Gera um arquivo físico vetorial em formato SVG nativo com o Gantt completo."""
         cell_w = 30
         cell_h = 35
         margin_x = 80
@@ -498,17 +469,11 @@ class GerenciadorGrafico:
         width = margin_x + (num_ticks * cell_w) + 100
         height = margin_y + (len(sorted_task_ids) * cell_h) + 60
 
-        # Início do documento SVG
         svg = [
-            f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" style="background-color:white; font-family:Arial, sans-serif;">'
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" style="background-color:white; font-family:Arial, sans-serif;">',
+            '<text x="20" y="30" font-size="16" font-weight="bold">Gráfico de Gantt - Simulador SO</text>',
         ]
 
-        # Título
-        svg.append(
-            '<text x="20" y="30" font-size="16" font-weight="bold">Gráfico de Gantt - Simulador SO</text>'
-        )
-
-        # Eixo Y (Tarefas)
         for idx, task_id in enumerate(sorted_task_ids):
             y_pos = margin_y + (idx * cell_h)
             svg.append(
@@ -518,20 +483,24 @@ class GerenciadorGrafico:
                 f'<line x1="{margin_x}" y1="{y_pos + cell_h}" x2="{width - 20}" y2="{y_pos + cell_h}" stroke="#f0f0f0" stroke-width="1" />'
             )
 
-        # Eixo X e Blocos
         for tick, cpu_map in gantt_history.items():
             x0 = margin_x + (tick * cell_w)
-
-            # Texto do Tick
             svg.append(
                 f'<text x="{x0 + (cell_w / 2)}" y="{margin_y - 10}" font-size="10" text-anchor="middle">{tick}</text>'
             )
 
-            # Blocos
-            for cpu_id, task_id in cpu_map.items():
-                if task_id and task_id in sorted_task_ids:
-                    task = tarefas[task_id]
-                    y_idx = sorted_task_ids.index(task_id)
+            if isinstance(cpu_map, dict):
+                cpu_items = cpu_map.items()
+            elif isinstance(cpu_map, list):
+                cpu_items = enumerate(cpu_map)
+            else:
+                cpu_items = []
+
+            for cpu_id, task_id in cpu_items:
+                if task_id and str(task_id) in sorted_task_ids:
+                    task_key = str(task_id)
+                    task = tarefas[task_key]
+                    y_idx = sorted_task_ids.index(task_key)
                     y0 = margin_y + (y_idx * cell_h) + 3
                     cor = getattr(task, "color", "#2196F3")
 
