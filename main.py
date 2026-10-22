@@ -8,6 +8,7 @@ from simulador import Simulador
 
 
 def extrair_estado_para_gui(simulador):
+    # Traduz o estado interno do simulador para um objeto simples que a interface gráfica consegue desenhar
     dict_tarefas = {str(t.id): t for t in simulador.tarefas}
     gantt_history = {}
 
@@ -21,10 +22,8 @@ def extrair_estado_para_gui(simulador):
                     if t_tick in gantt_history:
                         gantt_history[t_tick][ev.cpu_id] = str(t.id)
 
-    # Recolhe o conteúdo da fila de prontos (IDs das tarefas)
     fila_prontos_ids = [str(t.id) for t in simulador.fila_prontos]
 
-    # Recolhe o estado detalhado de cada CPU
     cpus_estado = []
     for cpu in simulador.processadores:
         cpus_estado.append({
@@ -57,12 +56,14 @@ def extrair_estado_para_gui(simulador):
 
 
 def main():
+    # Ponto de entrada da aplicação. Inicializa a janela gráfica e o contentor do simulador.
     gui = GerenciadorGrafico(
         titulo="Simulador SO - Visualizador", largura=1200, altura=750
     )
     simulador_container = {"instance": None}
 
     def carregar_arquivo_handler(caminho):
+        # Lê o ficheiro de configuração escolhido e arranca com a simulação
         print(f"[DEBUG] Lendo arquivo: {caminho}")
         configuracao = LeitorConfiguracao()
         configuracao.ler(caminho)
@@ -92,6 +93,7 @@ def main():
         )
 
     def avancar_handler():
+        # Avança um tick na simulação e atualiza a interface. Se terminar, abre o diálogo de exportação SVG.
         sim = simulador_container["instance"]
         if not sim:
             gui.paresar_animacao()
@@ -114,6 +116,7 @@ def main():
             gui.criar_mensagem_aviso("Simulação finalizada!")
 
     def retroceder_handler():
+        # Botão de desfazer: volta para o tick anterior
         sim = simulador_container["instance"]
         if not sim:
             return
@@ -126,6 +129,7 @@ def main():
             gui.criar_mensagem_aviso("Já está no tick inicial (0)!")
 
     def editar_tarefa_handler(task_id, novos_dados):
+        # Atualiza os dados de uma tarefa caso o usuário edite pelo painel
         sim = simulador_container["instance"]
         if not sim:
             return
@@ -140,6 +144,7 @@ def main():
             )
 
     def trocar_algoritmo_handler(nome):
+        # Trata a troca dinâmica de algoritmo solicitada na interface
         sim = simulador_container["instance"]
         if not sim:
             gui.criar_mensagem_aviso("Abra um arquivo de configuração primeiro.")
@@ -149,6 +154,7 @@ def main():
             gui.criar_mensagem_erro(mensagem)
         gui.renderizar_estado(extrair_estado_para_gui(sim))
 
+    # Associa os callbacks da interface gráfica às funções de controlo
     gui.on_carregar_ficheiro = carregar_arquivo_handler
     gui.on_avancar = avancar_handler
     gui.on_retroceder = retroceder_handler

@@ -6,7 +6,7 @@ from escalonador import ESCALONADORES
 
 
 def chave_ordenacao_y(x):
-    """Ordena numericamente usando int(x) (Req. 2.5)."""
+    # Garante a ordenação numérica dos IDs das tarefas no eixo Y (ex: 2 vem antes de 10)
     try:
         return int(x)
     except (ValueError, TypeError):
@@ -14,8 +14,10 @@ def chave_ordenacao_y(x):
 
 
 class GerenciadorGrafico:
-    """Gerenciador gráfico do Simulador de SO com painéis de Fila de Prontos, Estado das CPUs, TCB detalhado e SVG."""
-
+    """
+    Interface gráfica principal (Tkinter) responsável por desenhar o gráfico de Gantt,
+    a tabela TCB detalhada, os painéis do depurador e gerir os eventos do utilizador.
+    """
     def __init__(
         self, titulo="Simulador de SO - Dashboard", largura=1250, altura=780
     ):
@@ -23,6 +25,7 @@ class GerenciadorGrafico:
         self.root.title(titulo)
         self.root.geometry(f"{largura}x{altura}")
 
+        # Callbacks para ligar os botões da GUI às funções do controlador (main.py)
         self.on_carregar_ficheiro = None
         self.on_avancar = None
         self.on_retroceder = None
@@ -36,6 +39,7 @@ class GerenciadorGrafico:
         self._setup_layout()
 
     def _setup_layout(self):
+        # Barra superior com botões de controlo e seletores
         self.frame_controles = tk.Frame(self.root, bg="#f0f0f0", height=50)
         self.frame_controles.pack(fill=tk.X, side=tk.TOP, padx=10, pady=5)
 
@@ -109,6 +113,7 @@ class GerenciadorGrafico:
         )
         self.lbl_status.pack(side=tk.RIGHT, padx=10)
 
+        # Corpo central com o gráfico de Gantt e barras de deslocamento
         self.frame_corpo = tk.Frame(self.root, bg="white")
         self.frame_corpo.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
@@ -134,14 +139,13 @@ class GerenciadorGrafico:
         scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
         self.canvas_gantt.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        # Painel Lateral expandido (Fila de Prontos, Estado das CPUs e Legenda)
+        # Painel lateral do depurador (Fila de Prontos, Estado das CPUs e Legenda)
         self.frame_lateral = tk.LabelFrame(
             self.frame_corpo, text="Depurador & Legenda", bg="#f9f9f9", width=220
         )
         self.frame_lateral.pack(side=tk.RIGHT, fill=tk.Y, padx=(5, 0))
         self.frame_lateral.pack_propagate(False)
 
-        # Subpainel para Fila de Prontos
         self.lbl_sec_prontos = tk.Label(
             self.frame_lateral, text="📌 Fila de Prontos", font=("Arial", 9, "bold"), bg="#f9f9f9"
         )
@@ -152,7 +156,6 @@ class GerenciadorGrafico:
         )
         self.txt_prontos.pack(padx=5, pady=2, fill=tk.X)
 
-        # Subpainel para Estado das CPUs
         self.lbl_sec_cpus = tk.Label(
             self.frame_lateral, text="💻 Estado das CPUs", font=("Arial", 9, "bold"), bg="#f9f9f9"
         )
@@ -167,11 +170,10 @@ class GerenciadorGrafico:
             fill=tk.X, padx=5, pady=6
         )
 
-        # Legenda existente
         self.frame_sub_legenda = tk.Frame(self.frame_lateral, bg="#f9f9f9")
         self.frame_sub_legenda.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
 
-        # Tabela TCB Detalhada na parte inferior (com coluna de Concluídas adicionada)
+        # Painel inferior com a tabela TCB completa e barra de scroll
         self.frame_tcb = tk.LabelFrame(
             self.root, text="Bloco de Controlo de Tarefas (TCB Detalhado)", height=160
         )
@@ -203,9 +205,11 @@ class GerenciadorGrafico:
         self.tabela_tcb.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scroll_tcb_y.pack(side=tk.RIGHT, fill=tk.Y)
 
+        # Permite duplo clique numa linha da tabela para editar a tarefa
         self.tabela_tcb.bind("<Double-1>", self._on_double_click_tcb)
 
     def _acao_abrir_ficheiro(self):
+        # Abre a janela do sistema para selecionar o arquivo .txt de configuração
         caminho = filedialog.askopenfilename(
             title="Selecionar Ficheiro de Configuração",
             filetypes=[
@@ -234,6 +238,7 @@ class GerenciadorGrafico:
             self.on_trocar_algoritmo(self.cb_algoritmo.get())
 
     def alternar_play_pausa(self):
+        # Alterna entre execução automática contínua e pausa
         self.em_execucao = not self.em_execucao
         if self.em_execucao:
             self.btn_play.config(text="⏸ Pausa", bg="#f8d7da")
@@ -246,12 +251,14 @@ class GerenciadorGrafico:
         self.btn_play.config(text="▶ Play", bg="#d4edda")
 
     def _loop_animacao(self):
+        # Loop de execução que dispara avanços periódicos enquanto estiver em Play
         if self.em_execucao:
             self._acao_avancar()
             if self.em_execucao:
                 self.root.after(self.delay_ms, self._loop_animacao)
 
     def renderizar_estado(self, estado_simulacao):
+        # Atualiza todos os componentes da GUI com os dados do tick atual
         self.ultimo_estado = estado_simulacao
 
         tick = getattr(estado_simulacao, "tick", 0)
@@ -274,6 +281,7 @@ class GerenciadorGrafico:
         )
 
     def atualizar_tabela_tcb(self, tarefas, gantt_history, tick_atual):
+        # Limpa e preenche novamente a tabela TCB com as métricas atualizadas
         for item in self.tabela_tcb.get_children():
             self.tabela_tcb.delete(item)
 
@@ -309,14 +317,14 @@ class GerenciadorGrafico:
             )
 
     def atualizar_painel_lateral(self, tarefas, fila_prontos, cpus_estado):
-        # Atualiza texto da Fila de Prontos
+        # Atualiza a caixa de texto da fila de prontos
         if fila_prontos:
             texto_prontos = ", ".join([f"T{t_id}" for t_id in fila_prontos])
         else:
             texto_prontos = "(vazia)"
         self.txt_prontos.config(text=f" [{texto_prontos}]")
 
-        # Atualiza texto do Estado das CPUs
+        # Atualiza as informações de estado de cada CPU
         linhas_cpu = []
         for c in cpus_estado:
             c_id = c["id"]
@@ -325,7 +333,7 @@ class GerenciadorGrafico:
             linhas_cpu.append(f"C{c_id}: {t_str}")
         self.txt_cpus_estado.config(text="\n".join(linhas_cpu) if linhas_cpu else "N/A")
 
-        # Atualiza Legenda
+        # Reconstrói a legenda gráfica lateral
         for widget in self.frame_sub_legenda.winfo_children():
             widget.destroy()
 
@@ -406,6 +414,7 @@ class GerenciadorGrafico:
             lbl_txt.pack(side=tk.LEFT)
 
     def desenhar_gantt(self, gantt_history: dict, tarefas, total_cpus=1):
+        # Desenha a grelha temporal do Gantt e os blocos de execução no Canvas
         self.canvas_gantt.delete("all")
         if not tarefas:
             return
@@ -551,6 +560,7 @@ class GerenciadorGrafico:
         self._abrir_janela_edicao_tarefa(task_id, val)
 
     def _abrir_janela_edicao_tarefa(self, task_id, val_atuais):
+        # Abre um diálogo simples para alterar parâmetros da tarefa em tempo real
         top = tk.Toplevel(self.root)
         top.title(f"Editar Tarefa - T{task_id}")
         top.geometry("280x220")
@@ -588,7 +598,7 @@ class GerenciadorGrafico:
             width=10,
             state="readonly",
         )
-        cb_estado.set(val_atuais[9])  # Estado atualizado na coluna 9 devido à nova coluna
+        cb_estado.set(val_atuais[9])
         cb_estado.grid(row=2, column=1, pady=2)
 
         def salvar():
@@ -610,6 +620,7 @@ class GerenciadorGrafico:
         ).pack(pady=10)
 
     def _acao_exportar_svg(self):
+        # Abre o explorador de ficheiros para escolher o caminho e guardar o SVG
         if not self.ultimo_estado:
             self.criar_mensagem_erro(
                 "Não há dados de simulação para exportar!"
@@ -635,6 +646,7 @@ class GerenciadorGrafico:
         tarefas,
         total_cpus: int = 1,
     ):
+        # Constrói o ficheiro vetorial SVG contendo o gráfico de Gantt e a legenda
         cell_w = 36
         cell_h = 40
         margin_x = 90

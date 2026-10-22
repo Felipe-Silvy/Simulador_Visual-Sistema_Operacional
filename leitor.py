@@ -2,32 +2,30 @@ from tcb import TCB
 from escalonador import ESCALONADORES
 
 class LeitorConfiguracao:
-    # Construtor: executado ao criar um objeto
+    """
+    Faz a leitura e validação do ficheiro de configuração de texto (.txt) fornecido pelo usuário.
+    """
     def __init__(self, descricao="Classe que faz a leitura do arquivo txt e trata erros"):
-        # Atributos de instância (da configuração) com valores padrão [req. 3.2]
-        # Se o arquivo informar algo, ler() sobrescreve esses valores.
+        # Valores padrão caso o arquivo não especifique
         self.escalonador = "RM"
         self.quantum = 1
         self.num_cpus = 1
         self.tarefas = []
-        # Lista de mensagens de erro, para mostrar ao usuário depois
         self.erros = []
-        self.avisos = [] # Alguns eventos devem ser notificados ao usuário, mas não são considerados erros
+        self.avisos = [] 
         self.descricao = descricao
 
-    # Método de instância
     def ler(self, caminho):
         try:
             with open(caminho, encoding="utf-8") as f:      
-                 # Lê todas as linhas, tira espaços e ignora as em branco [req. 3.3.6]
+                 # Lê o arquivo ignorando linhas vazias e espaços extras
                 linhas = [l.strip() for l in f if l.strip()]
 
-            # Para não dar erro em linhas[0] e garantir o mínimo de linhas [req. 3.3.1]
             if len(linhas) < 2:
                 self.erros.append("O arquivo precisa ter ao menos 2 linhas: sistema e uma tarefa.")
                 return
             
-            # A primeira linha é o cabeçalho, as demais são tarefas [req. 3.3.1]
+            # A primeira linha define as regras globais e as seguintes criam as tarefas
             self._ler_cabecalho(linhas[0])
 
             for linha in linhas[1:]:
@@ -43,7 +41,6 @@ class LeitorConfiguracao:
             self.erros.append(f"Encoding inválido em: {caminho}")
 
     def _ler_cabecalho(self, linha):
-        # TODO: interpretar "algoritmo;quantum;qtde_cpus"
         campos = linha.rstrip(";").split(";")
 
         if len(campos) != 3:
@@ -56,7 +53,6 @@ class LeitorConfiguracao:
         else:
             self.escalonador = algoritmo
 
-        # Verificando se os dois valores são inteiros maiores que zero
         try:
             quantum = int(campos[1])
             num_cpus = int(campos[2])
@@ -72,11 +68,10 @@ class LeitorConfiguracao:
         
 
     def _ler_tarefa(self, linha):
-        # O formato é id;cor;ingresso;duracao;periodo;prazo;lista_eventos
-
+        # Interpreta cada campo de uma linha de tarefa
         campos = [c.strip() for c in linha.rstrip(";").split(";")]
 
-        if len(campos) < 6: # O Sétimo campo é opcional
+        if len(campos) < 6: 
             self.erros.append(f"Tarefa inválida (faltam campos): '{linha}'")
             return
         
@@ -109,16 +104,13 @@ class LeitorConfiguracao:
             self.erros.append(f"ingresso deve ser >= 0; duracao e prazo devem ser >= 1: '{linha}'")
             return
 
-        if any(t.id == id for t in self.tarefas): # Se alguma tarefa tiver ID repetido
+        if any(t.id == id for t in self.tarefas): 
             self.erros.append(f"Id {id} repetido (o id deve ser único): '{linha}'")
             return
 
-        eventos = campos[6:] # Guarda pro projeto B 
+        eventos = campos[6:] 
 
-        self.tarefas.append(TCB(id, cor, ingresso, duracao, periodo, prazo, eventos)) # Adiciona na lista de tarefas uma instância de TCB
+        self.tarefas.append(TCB(id, cor, ingresso, duracao, periodo, prazo, eventos))
 
-
-    # Representação em texto do objeto (opcional, mas útil para debugging)
     def __str__(self):
         return f"Pessoa({self.descricao})"
-
