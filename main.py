@@ -52,7 +52,6 @@ def main():
         configuracao = LeitorConfiguracao()
         configuracao.ler(caminho)
 
-        # IMPRIMA ESTES DADOS PARA CONFERIR NO TERMINAL:
         print(f"[DEBUG] Algoritmo lido: {configuracao.escalonador}")
         print(f"[DEBUG] Num CPUs: {configuracao.num_cpus}")
         print(f"[DEBUG] Total de tarefas lidas: {len(configuracao.tarefas)}")
@@ -101,6 +100,11 @@ def main():
             gui.renderizar_estado(extrair_estado_para_gui(sim))
         else:
             gui.paresar_animacao()
+            
+            # Abre automaticamente a janela interativa para salvar o SVG ao terminar a simulação
+            gui.ultimo_estado = extrair_estado_para_gui(sim)
+            gui._acao_exportar_svg()
+
             gui.criar_mensagem_aviso("Simulação finalizada!")
 
     def retroceder_handler():

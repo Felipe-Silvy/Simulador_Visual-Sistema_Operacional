@@ -13,10 +13,10 @@ def chave_ordenacao_y(x):
 
 
 class GerenciadorGrafico:
-    """Gerenciador gráfico do Simulador de SO com ordenação numérica, legenda completa e exportação SVG rica."""
+    """Gerenciador gráfico do Simulador de SO com tabela TCB detalhada, legenda limpa e exportação SVG rica."""
 
     def __init__(
-        self, titulo="Simulador de SO - Dashboard", largura=1150, altura=750
+        self, titulo="Simulador de SO - Dashboard", largura=1200, altura=750
     ):
         self.root = tk.Tk()
         self.root.title(titulo)
@@ -121,38 +121,43 @@ class GerenciadorGrafico:
         scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
         self.canvas_gantt.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
+        # Painel Lateral Limpo (Apenas Legenda)
         self.frame_legenda = tk.LabelFrame(
-            self.frame_corpo, text="Legenda", bg="#f9f9f9", width=160
+            self.frame_corpo, text="Legenda", bg="#f9f9f9", width=200
         )
         self.frame_legenda.pack(side=tk.RIGHT, fill=tk.Y, padx=(5, 0))
+        self.frame_legenda.pack_propagate(False)
 
-        self.frame_tcb = tk.Frame(self.root, height=150)
-        self.frame_tcb.pack(fill=tk.X, side=tk.BOTTOM, padx=10, pady=5)
-
-        self.tabela_tcb = ttk.Treeview(
-            self.frame_tcb,
-            columns=(
-                "ID",
-                "Ingresso",
-                "Duração",
-                "Período",
-                "Deadline",
-                "Estado",
-            ),
-            show="headings",
-            height=5,
+        # Tabela TCB Detalhada na parte inferior
+        self.frame_tcb = tk.LabelFrame(
+            self.root, text="Bloco de Controlo de Tarefas (TCB Detalhado)", height=160
         )
-        for col in (
+        self.frame_tcb.pack(fill=tk.X, side=tk.BOTTOM, padx=10, pady=5)
+        self.frame_tcb.pack_propagate(False)
+
+        colunas_tcb = (
             "ID",
             "Ingresso",
             "Duração",
+            "Restante",
             "Período",
             "Deadline",
+            "Misses",
+            "CPU",
             "Estado",
-        ):
+        )
+        self.tabela_tcb = ttk.Treeview(
+            self.frame_tcb, columns=colunas_tcb, show="headings", height=5
+        )
+        for col in colunas_tcb:
             self.tabela_tcb.heading(col, text=col)
-            self.tabela_tcb.column(col, anchor="center")
-        self.tabela_tcb.pack(fill=tk.X)
+            self.tabela_tcb.column(col, anchor="center", width=85)
+        
+        scroll_tcb_y = ttk.Scrollbar(self.frame_tcb, orient=tk.VERTICAL, command=self.tabela_tcb.yview)
+        self.tabela_tcb.configure(yscrollcommand=scroll_tcb_y.set)
+        
+        self.tabela_tcb.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scroll_tcb_y.pack(side=tk.RIGHT, fill=tk.Y)
 
         self.tabela_tcb.bind("<Double-1>", self._on_double_click_tcb)
 
@@ -208,7 +213,7 @@ class GerenciadorGrafico:
         gantt_history = getattr(estado_simulacao, "gantt_history", {})
 
         self.atualizar_status(tick, algoritmo, cpus)
-        self.atualizar_tabela_tcb(tarefas)
+        self.atualizar_tabela_tcb(tarefas, gantt_history, tick)
         self.atualizar_legenda(tarefas)
         self.desenhar_gantt(gantt_history, tarefas, cpus)
         self.root.update()
@@ -218,28 +223,48 @@ class GerenciadorGrafico:
             text=f"Tick: {tick} | Algo: {algoritmo} | CPUs: {cpus}"
         )
 
-    def atualizar_tabela_tcb(self, tarefas: dict):
+    def atualizar_tabela_tcb(self, tarefas, gantt_history, tick_atual):
         for item in self.tabela_tcb.get_children():
             self.tabela_tcb.delete(item)
 
-        sorted_keys = sorted(tarefas.keys(), key=chave_ordenacao_y)
+        if isinstance(tarefas, list):
+            tarefas_dict = {str(t.id): t for t in tarefas}
+        else:
+            tarefas_dict = {str(k): v for k, v in tarefas.items()}
+
+        cpu_at_map = {}
+        if tick_atual in gantt_history:
+            for cpu_id, t_id in gantt_history[tick_atual].items():
+                if t_id is not None:
+                    cpu_at_map[str(t_id)] = f"C{cpu_id}"
+
+        sorted_keys = sorted(tarefas_dict.keys(), key=chave_ordenacao_y)
         for t_id in sorted_keys:
-            t = tarefas[t_id]
+            t = tarefas_dict[t_id]
             ingresso = getattr(t, "ingresso", 0)
-            duracao = getattr(t, "duracao", "-")
+            duracao = getattr(t, "duracao", 0)
+            executado = getattr(t, "tempo_executado", 0)
+            restante = max(0, duracao - executado)
             periodo = getattr(t, "periodo", "-")
-            prazo = getattr(t, "prazo", "-")
+            deadline = getattr(t, "deadline_absoluto", "-")
+            misses = sum(1 for ev in getattr(t, "historico_eventos", []) if ev.tipo == "DEADLINE_MISS")
+            cpu_at = cpu_at_map.get(str(t_id), "-")
             estado = getattr(t, "estado", "AGUARDANDO")
 
             self.tabela_tcb.insert(
                 "",
                 tk.END,
-                values=(str(t_id), ingresso, duracao, periodo, prazo, estado),
+                values=(str(t_id), ingresso, duracao, restante, periodo, deadline, misses, cpu_at, estado),
             )
 
-    def atualizar_legenda(self, tarefas: dict):
+    def atualizar_legenda(self, tarefas):
         for widget in self.frame_legenda.winfo_children():
             widget.destroy()
+
+        if isinstance(tarefas, list):
+            tarefas_dict = {str(t.id): t for t in tarefas}
+        else:
+            tarefas_dict = {str(k): v for k, v in tarefas.items()}
 
         lbl_sec_tarefas = tk.Label(
             self.frame_legenda,
@@ -247,16 +272,16 @@ class GerenciadorGrafico:
             font=("Arial", 9, "bold"),
             bg="#f9f9f9",
         )
-        lbl_sec_tarefas.pack(anchor="w", padx=5, pady=(5, 2))
+        lbl_sec_tarefas.pack(anchor="w", padx=5, pady=(2, 2))
 
-        sorted_keys = sorted(tarefas.keys(), key=chave_ordenacao_y)
+        sorted_keys = sorted(tarefas_dict.keys(), key=chave_ordenacao_y)
         for t_id in sorted_keys:
-            task = tarefas[t_id]
+            task = tarefas_dict[t_id]
             cor_hex = getattr(task, "cor", "2196F3")
             cor = f"#{cor_hex}" if not str(cor_hex).startswith("#") else cor_hex
 
             item_frame = tk.Frame(self.frame_legenda, bg="#f9f9f9")
-            item_frame.pack(fill=tk.X, padx=5, pady=2)
+            item_frame.pack(fill=tk.X, padx=5, pady=1)
 
             box_cor = tk.Label(
                 item_frame, bg=cor, width=2, height=1, relief="solid", bd=1
@@ -272,7 +297,7 @@ class GerenciadorGrafico:
             lbl_id.pack(side=tk.LEFT)
 
         ttk.Separator(self.frame_legenda, orient="horizontal").pack(
-            fill=tk.X, padx=5, pady=6
+            fill=tk.X, padx=5, pady=4
         )
 
         lbl_sec_eventos = tk.Label(
@@ -287,6 +312,7 @@ class GerenciadorGrafico:
             ("↓", "green", "Chegada"),
             ("↑", "blue", "Conclusão"),
             ("✕", "red", "Deadline Miss"),
+            ("⇡", "#FF8C00", "Ativação Ignorada"),
             ("S", "purple", "Sorteio"),
             ("■", "#cccccc", "CPU Desligada"),
             ("...", "black", "Tarefa Suspensa"),
@@ -311,19 +337,23 @@ class GerenciadorGrafico:
             )
             lbl_txt.pack(side=tk.LEFT)
 
-    def desenhar_gantt(self, gantt_history: dict, tarefas: dict, total_cpus=1):
+    def desenhar_gantt(self, gantt_history: dict, tarefas, total_cpus=1):
         self.canvas_gantt.delete("all")
         if not tarefas:
             return
+
+        if isinstance(tarefas, list):
+            tarefas_dict = {str(t.id): t for t in tarefas}
+        else:
+            tarefas_dict = {str(k): v for k, v in tarefas.items()}
 
         cell_w = 32
         cell_h = 38
         margin_x = 75
         margin_y = 45
 
-        # Ordenação numérica correta no eixo Y (Req. 2.5) com key=lambda x: int(x)
         sorted_task_ids = sorted(
-            [str(k) for k in tarefas.keys()], key=chave_ordenacao_y
+            [str(k) for k in tarefas_dict.keys()], key=chave_ordenacao_y
         )
 
         for idx, task_id in enumerate(sorted_task_ids):
@@ -359,7 +389,7 @@ class GerenciadorGrafico:
             for cpu_id, task_id in cpu_map.items():
                 if task_id is not None and str(task_id) in sorted_task_ids:
                     task_key = str(task_id)
-                    task = tarefas[task_key]
+                    task = tarefas_dict[task_key]
                     y_idx = sorted_task_ids.index(task_key)
                     y0 = margin_y + (y_idx * cell_h) + 3
                     y1 = y0 + cell_h - 6
@@ -390,9 +420,8 @@ class GerenciadorGrafico:
                             font=("Arial", 7, "bold"),
                         )
 
-            # Desenho dos eventos alinhados ao x0 exacto
             for task_id in sorted_task_ids:
-                task = tarefas[task_id]
+                task = tarefas_dict[task_id]
                 y_idx = sorted_task_ids.index(str(task_id))
                 y0 = margin_y + (y_idx * cell_h) + 3
                 y1 = y0 + cell_h - 6
@@ -425,6 +454,12 @@ class GerenciadorGrafico:
                                 text="✕",
                                 fill="red",
                                 font=("Arial", 10, "bold"),
+                            )
+                        elif ev.tipo == "ATIVACAO_IGNORADA":
+                            self.canvas_gantt.create_line(
+                                x0 + 5, y1 + 14, x0 + 5, y1 + 2,
+                                arrow=tk.LAST, fill="#FF8C00",
+                                dash=(2, 2), width=2,
                             )
                         elif ev.tipo == "SORTEIO":
                             self.canvas_gantt.create_text(
@@ -473,7 +508,7 @@ class GerenciadorGrafico:
             row=1, column=0, sticky="e", pady=2
         )
         ent_dl = tk.Entry(frame_form, width=10)
-        ent_dl.insert(0, str(val_atuais[4]))
+        ent_dl.insert(0, str(val_atuais[5]))
         ent_dl.grid(row=1, column=1, pady=2)
 
         tk.Label(frame_form, text="Estado:").grid(
@@ -485,7 +520,7 @@ class GerenciadorGrafico:
             width=10,
             state="readonly",
         )
-        cb_estado.set(val_atuais[5])
+        cb_estado.set(val_atuais[8])
         cb_estado.grid(row=2, column=1, pady=2)
 
         def salvar():
@@ -529,7 +564,7 @@ class GerenciadorGrafico:
         self,
         caminho_arquivo: str,
         gantt_history: dict,
-        tarefas: dict,
+        tarefas,
         total_cpus: int = 1,
     ):
         cell_w = 36
@@ -537,7 +572,11 @@ class GerenciadorGrafico:
         margin_x = 90
         margin_y = 60
 
-        tarefas_norm = {str(k): v for k, v in tarefas.items()}
+        if isinstance(tarefas, list):
+            tarefas_norm = {str(t.id): t for t in tarefas}
+        else:
+            tarefas_norm = {str(k): v for k, v in tarefas.items()}
+
         sorted_task_ids = sorted(
             list(tarefas_norm.keys()), key=chave_ordenacao_y
         )
@@ -546,7 +585,7 @@ class GerenciadorGrafico:
         width = margin_x + (num_ticks * cell_w) + 140
         height = (
             margin_y + (len(sorted_task_ids) * cell_h) + 140
-        )  # Espaço extra para a legenda no SVG
+        )
 
         svg = [
             f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
@@ -555,7 +594,6 @@ class GerenciadorGrafico:
             '  <text x="20" y="30" font-size="16" font-weight="bold" fill="#000000" font-family="sans-serif">Gráfico de Gantt - Simulador SO</text>',
         ]
 
-        # 1. Rótulos Eixo Y (Ordenados numericamente)
         for idx, task_id in enumerate(sorted_task_ids):
             y_pos = margin_y + (idx * cell_h)
             svg.append(
@@ -568,7 +606,6 @@ class GerenciadorGrafico:
                 f'  <line x1="{margin_x}" y1="{y_pos + cell_h}" x2="{width - 30}" y2="{y_pos + cell_h}" stroke="#d0d0d0" stroke-width="1" />'
             )
 
-        # 2. Marcadores Eixo X
         for tick in range(num_ticks):
             cpu_map = gantt_history.get(
                 tick, {c: None for c in range(total_cpus)}
@@ -613,7 +650,6 @@ class GerenciadorGrafico:
                                 f'  <text x="{x0 + (cell_w / 2)}" y="{y0 + 20}" font-size="9" font-weight="bold" fill="#ffffff" font-family="sans-serif" text-anchor="middle">C{cpu_id}</text>'
                             )
 
-            # 3. Eventos Vetoriais
             for task_id in sorted_task_ids:
                 task = tarefas_norm.get(str(task_id))
                 if not task:
@@ -640,21 +676,25 @@ class GerenciadorGrafico:
                             svg.append(
                                 f'  <path d="M{x0-4} {y0-8} L{x0+4} {y0-2} M{x0+4} {y0-8} L{x0-4} {y0-2}" stroke="#FF0000" stroke-width="2" fill="none" />'
                             )
+                        elif ev.tipo == "ATIVACAO_IGNORADA":
+                            svg.append(
+                                f'  <path d="M{x0+5} {y1+14} L{x0+5} {y1+2} M{x0+2} {y1+6} L{x0+5} {y1+2} L{x0+8} {y1+6}" stroke="#FF8C00" stroke-width="2" stroke-dasharray="2,2" fill="none" />'
+                            )
                         elif ev.tipo == "SORTEIO":
                             svg.append(
                                 f'  <text x="{x0 + (cell_w / 2)}" y="{y0 + 14}" font-size="10" font-weight="bold" fill="purple" font-family="sans-serif" text-anchor="middle">S</text>'
                             )
 
-        # Bloco de Legenda Integrado no SVG
         legenda_y = margin_y + (len(sorted_task_ids) * cell_h) + 30
         svg.append(f'  <g transform="translate({margin_x}, {legenda_y})">')
-        svg.append(f'    <rect width="450" height="60" fill="#f9f9f9" stroke="#cccccc" rx="5"/>')
+        svg.append(f'    <rect width="580" height="60" fill="#f9f9f9" stroke="#cccccc" rx="5"/>')
         svg.append(f'    <text x="15" y="20" font-size="12" font-weight="bold" fill="#000" font-family="sans-serif">Legenda de Eventos:</text>')
         svg.append(f'    <text x="15" y="42" font-size="11" fill="green" font-family="sans-serif">↓ Chegada</text>')
         svg.append(f'    <text x="95" y="42" font-size="11" fill="blue" font-family="sans-serif">↑ Conclusão</text>')
         svg.append(f'    <text x="180" y="42" font-size="11" fill="red" font-family="sans-serif">✕ Deadline Miss</text>')
-        svg.append(f'    <text x="290" y="42" font-size="11" fill="purple" font-family="sans-serif">S: Sorteio</text>')
-        svg.append(f'    <text x="365" y="42" font-size="11" fill="#444" font-family="sans-serif">... Suspensa</text>')
+        svg.append(f'    <text x="290" y="42" font-size="11" fill="#FF8C00" font-family="sans-serif">⇡ Ativação Ignorada</text>')
+        svg.append(f'    <text x="420" y="42" font-size="11" fill="purple" font-family="sans-serif">S: Sorteio</text>')
+        svg.append(f'    <text x="495" y="42" font-size="11" fill="#444" font-family="sans-serif">... Suspensa</text>')
         svg.append(f'  </g>')
 
         svg.append("</svg>")

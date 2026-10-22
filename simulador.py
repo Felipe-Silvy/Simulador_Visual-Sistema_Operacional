@@ -15,8 +15,7 @@ class Simulador:
         self._salvar_snapshot()
 
     def executar(self):
-        limite = 1000
-        while self.relogio < limite and self.avancar():
+        while self.avancar():
             pass
 
     def avancar(self):
@@ -50,16 +49,16 @@ class Simulador:
         self._salvar_snapshot()  # Registra o Memento[cite: 1]
 
     def _ativar_tarefas(self):
-        for tcb in self.tarefas:
-            if self._deve_ativar(tcb):
-                if tcb.estado in ("PRONTA", "EXECUTANDO"):
-                    print(
-                        f"AVISO tick {self.relogio}: tarefa {tcb.id} ainda não terminou a instância anterior; nova ativação ignorada."
-                    )
-                else:
-                    tcb.ativar_tarefa(self.relogio)
-                    self.fila_prontos.append(tcb)
-                    tcb.adicionar_evento("CHEGADA", self.relogio, self.relogio)
+            for tcb in self.tarefas:
+                if self._deve_ativar(tcb):
+                    if tcb.estado in ("PRONTA", "EXECUTANDO"):
+                        tcb.adicionar_evento(
+                            "ATIVACAO_IGNORADA", self.relogio, self.relogio
+                        )
+                    else:
+                        tcb.ativar_tarefa(self.relogio)
+                        self.fila_prontos.append(tcb)
+                        tcb.adicionar_evento("CHEGADA", self.relogio, self.relogio)
 
     def _verificar_deadlines(self):
         """Métrica visual: registra o evento de perda de deadline."""
@@ -130,6 +129,7 @@ class Simulador:
             if tcb.tempo_executado >= tcb.duracao:
                 tcb.adicionar_evento("FIM", self.relogio + 1, self.relogio + 1)
                 cpu.desalocar_tarefa()
+                cpu.desligar() 
                 tcb.concluir_execucao()
 
     def _salvar_snapshot(self):
@@ -146,16 +146,13 @@ class Simulador:
         if tcb is None:
             return False
 
-        # Aplica as novas propriedades
         for chave, valor in novas_propriedades.items():
             if hasattr(tcb, chave):
                 setattr(tcb, chave, valor)
 
-        # SE O ESTADO FOI MUDADO PARA PRONTA, GARANTE QUE ELA ESTÁ NA FILA DE PRONTOS
         if tcb.estado == "PRONTA" and tcb not in self.fila_prontos:
             self.fila_prontos.append(tcb)
 
-        # Se mudou a duração durante uma execução ativa, reseta o progresso atual
         if "duracao" in novas_propriedades and tcb.tempo_executado >= tcb.duracao:
             tcb.tempo_executado = 0
 
