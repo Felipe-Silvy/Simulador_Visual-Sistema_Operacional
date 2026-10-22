@@ -2,6 +2,7 @@ import os
 import re
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
+from escalonador import ESCALONADORES
 
 
 def chave_ordenacao_y(x):
@@ -26,6 +27,7 @@ class GerenciadorGrafico:
         self.on_avancar = None
         self.on_retroceder = None
         self.on_editar_tarefa = None
+        self.on_trocar_algoritmo = None
 
         self.em_execucao = False
         self.delay_ms = 1
@@ -87,6 +89,17 @@ class GerenciadorGrafico:
             bg="#e1e1e1",
         )
         self.btn_exportar.pack(side=tk.LEFT, padx=10)
+
+        self.cb_algoritmo = ttk.Combobox(
+            self.frame_controles,
+            values=list(ESCALONADORES),
+            width=6,
+            state="readonly",
+        )
+        self.cb_algoritmo.pack(side=tk.LEFT, padx=3)
+        self.cb_algoritmo.bind(
+            "<<ComboboxSelected>>", self._acao_trocar_algoritmo
+        )
 
         self.lbl_status = tk.Label(
             self.frame_controles,
@@ -215,6 +228,10 @@ class GerenciadorGrafico:
     def _acao_retroceder(self):
         if callable(self.on_retroceder):
             self.on_retroceder()
+
+    def _acao_trocar_algoritmo(self, event=None):
+        if callable(self.on_trocar_algoritmo):
+            self.on_trocar_algoritmo(self.cb_algoritmo.get())
 
     def alternar_play_pausa(self):
         self.em_execucao = not self.em_execucao

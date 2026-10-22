@@ -1,7 +1,7 @@
 from processador import Processador
 from snapshot import SnapshotSimulacao
 from historico import HistoricoSimulacao
-
+from escalonador import ESCALONADORES
 
 class Simulador:
     def __init__(self, num_cpus, tarefas, escalonador):
@@ -173,3 +173,19 @@ class Simulador:
             return False
         self.restaurar_estado(snap)
         return True
+
+    def trocar_escalonador(self, nome):
+        """Troca o algoritmo a partir do tick atual. Devolve (ok, mensagem)."""
+        classe = ESCALONADORES.get(nome)
+        if classe is None:
+            return False, f"Algoritmo '{nome}' desconhecido."
+        self.escalonador = classe()
+        # Se o usuário estiver no passado, o futuro já calculado com o algoritmo
+        # antigo deixa de valer: descartamos e recalculamos a partir daqui.
+        self.historico.invalidar_futuro_por_edicao()
+        self.historico.substituir_atual(
+            SnapshotSimulacao(
+                self.relogio, self.processadores, self.tarefas, self.fila_prontos
+            )
+        )
+        return True, f"Algoritmo alterado para {nome}."

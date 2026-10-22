@@ -139,10 +139,21 @@ def main():
                 "Não foi possível editar a tarefa selecionada."
             )
 
+    def trocar_algoritmo_handler(nome):
+        sim = simulador_container["instance"]
+        if not sim:
+            gui.criar_mensagem_aviso("Abra um arquivo de configuração primeiro.")
+            return
+        ok, mensagem = sim.trocar_escalonador(nome)
+        if not ok:
+            gui.criar_mensagem_erro(mensagem)
+        gui.renderizar_estado(extrair_estado_para_gui(sim))
+
     gui.on_carregar_ficheiro = carregar_arquivo_handler
     gui.on_avancar = avancar_handler
     gui.on_retroceder = retroceder_handler
     gui.on_editar_tarefa = editar_tarefa_handler
+    gui.on_trocar_algoritmo = trocar_algoritmo_handler
 
     gui.iniciar_loop()
 
