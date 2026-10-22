@@ -13,10 +13,10 @@ def chave_ordenacao_y(x):
 
 
 class GerenciadorGrafico:
-    """Gerenciador gráfico do Simulador de SO com tabela TCB detalhada, legenda limpa e exportação SVG rica."""
+    """Gerenciador gráfico do Simulador de SO com painéis de Fila de Prontos, Estado das CPUs, TCB detalhado e SVG."""
 
     def __init__(
-        self, titulo="Simulador de SO - Dashboard", largura=1200, altura=750
+        self, titulo="Simulador de SO - Dashboard", largura=1250, altura=780
     ):
         self.root = tk.Tk()
         self.root.title(titulo)
@@ -28,7 +28,7 @@ class GerenciadorGrafico:
         self.on_editar_tarefa = None
 
         self.em_execucao = False
-        self.delay_ms = 1  # Execução na velocidade máxima (1ms por tick)
+        self.delay_ms = 1
         self.ultimo_estado = None
 
         self._setup_layout()
@@ -121,14 +121,44 @@ class GerenciadorGrafico:
         scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
         self.canvas_gantt.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        # Painel Lateral Limpo (Apenas Legenda)
-        self.frame_legenda = tk.LabelFrame(
-            self.frame_corpo, text="Legenda", bg="#f9f9f9", width=200
+        # Painel Lateral expandido (Fila de Prontos, Estado das CPUs e Legenda)
+        self.frame_lateral = tk.LabelFrame(
+            self.frame_corpo, text="Depurador & Legenda", bg="#f9f9f9", width=220
         )
-        self.frame_legenda.pack(side=tk.RIGHT, fill=tk.Y, padx=(5, 0))
-        self.frame_legenda.pack_propagate(False)
+        self.frame_lateral.pack(side=tk.RIGHT, fill=tk.Y, padx=(5, 0))
+        self.frame_lateral.pack_propagate(False)
 
-        # Tabela TCB Detalhada na parte inferior
+        # Subpainel para Fila de Prontos
+        self.lbl_sec_prontos = tk.Label(
+            self.frame_lateral, text="📌 Fila de Prontos", font=("Arial", 9, "bold"), bg="#f9f9f9"
+        )
+        self.lbl_sec_prontos.pack(anchor="w", padx=5, pady=(5, 2))
+        
+        self.txt_prontos = tk.Label(
+            self.frame_lateral, text="[ ]", font=("Consolas", 9), bg="#ffffff", relief="sunken", anchor="w", justify="left", width=26
+        )
+        self.txt_prontos.pack(padx=5, pady=2, fill=tk.X)
+
+        # Subpainel para Estado das CPUs
+        self.lbl_sec_cpus = tk.Label(
+            self.frame_lateral, text="💻 Estado das CPUs", font=("Arial", 9, "bold"), bg="#f9f9f9"
+        )
+        self.lbl_sec_cpus.pack(anchor="w", padx=5, pady=(8, 2))
+
+        self.txt_cpus_estado = tk.Label(
+            self.frame_lateral, text="Nenhuma CPU ativa", font=("Consolas", 8), bg="#ffffff", relief="sunken", anchor="w", justify="left", width=26, height=4
+        )
+        self.txt_cpus_estado.pack(padx=5, pady=2, fill=tk.X)
+
+        ttk.Separator(self.frame_lateral, orient="horizontal").pack(
+            fill=tk.X, padx=5, pady=6
+        )
+
+        # Legenda existente
+        self.frame_sub_legenda = tk.Frame(self.frame_lateral, bg="#f9f9f9")
+        self.frame_sub_legenda.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
+
+        # Tabela TCB Detalhada na parte inferior (com coluna de Concluídas adicionada)
         self.frame_tcb = tk.LabelFrame(
             self.root, text="Bloco de Controlo de Tarefas (TCB Detalhado)", height=160
         )
@@ -142,6 +172,7 @@ class GerenciadorGrafico:
             "Restante",
             "Período",
             "Deadline",
+            "Concluídas",
             "Misses",
             "CPU",
             "Estado",
@@ -151,7 +182,7 @@ class GerenciadorGrafico:
         )
         for col in colunas_tcb:
             self.tabela_tcb.heading(col, text=col)
-            self.tabela_tcb.column(col, anchor="center", width=85)
+            self.tabela_tcb.column(col, anchor="center", width=75)
         
         scroll_tcb_y = ttk.Scrollbar(self.frame_tcb, orient=tk.VERTICAL, command=self.tabela_tcb.yview)
         self.tabela_tcb.configure(yscrollcommand=scroll_tcb_y.set)
@@ -211,10 +242,12 @@ class GerenciadorGrafico:
         cpus = getattr(estado_simulacao, "cpus", 1)
         tarefas = getattr(estado_simulacao, "tarefas", {})
         gantt_history = getattr(estado_simulacao, "gantt_history", {})
+        fila_prontos = getattr(estado_simulacao, "fila_prontos", [])
+        cpus_estado = getattr(estado_simulacao, "cpus_estado", [])
 
         self.atualizar_status(tick, algoritmo, cpus)
         self.atualizar_tabela_tcb(tarefas, gantt_history, tick)
-        self.atualizar_legenda(tarefas)
+        self.atualizar_painel_lateral(tarefas, fila_prontos, cpus_estado)
         self.desenhar_gantt(gantt_history, tarefas, cpus)
         self.root.update()
 
@@ -247,6 +280,7 @@ class GerenciadorGrafico:
             restante = max(0, duracao - executado)
             periodo = getattr(t, "periodo", "-")
             deadline = getattr(t, "deadline_absoluto", "-")
+            concluidas = getattr(t, "execucoes_concluidas", 0)
             misses = sum(1 for ev in getattr(t, "historico_eventos", []) if ev.tipo == "DEADLINE_MISS")
             cpu_at = cpu_at_map.get(str(t_id), "-")
             estado = getattr(t, "estado", "AGUARDANDO")
@@ -254,11 +288,28 @@ class GerenciadorGrafico:
             self.tabela_tcb.insert(
                 "",
                 tk.END,
-                values=(str(t_id), ingresso, duracao, restante, periodo, deadline, misses, cpu_at, estado),
+                values=(str(t_id), ingresso, duracao, restante, periodo, deadline, concluidas, misses, cpu_at, estado),
             )
 
-    def atualizar_legenda(self, tarefas):
-        for widget in self.frame_legenda.winfo_children():
+    def atualizar_painel_lateral(self, tarefas, fila_prontos, cpus_estado):
+        # Atualiza texto da Fila de Prontos
+        if fila_prontos:
+            texto_prontos = ", ".join([f"T{t_id}" for t_id in fila_prontos])
+        else:
+            texto_prontos = "(vazia)"
+        self.txt_prontos.config(text=f" [{texto_prontos}]")
+
+        # Atualiza texto do Estado das CPUs
+        linhas_cpu = []
+        for c in cpus_estado:
+            c_id = c["id"]
+            t_exec = c["tarefa_atual"]
+            t_str = f"Executando T{t_exec}" if t_exec else "Ociosa / Desligada"
+            linhas_cpu.append(f"C{c_id}: {t_str}")
+        self.txt_cpus_estado.config(text="\n".join(linhas_cpu) if linhas_cpu else "N/A")
+
+        # Atualiza Legenda
+        for widget in self.frame_sub_legenda.winfo_children():
             widget.destroy()
 
         if isinstance(tarefas, list):
@@ -267,12 +318,12 @@ class GerenciadorGrafico:
             tarefas_dict = {str(k): v for k, v in tarefas.items()}
 
         lbl_sec_tarefas = tk.Label(
-            self.frame_legenda,
+            self.frame_sub_legenda,
             text="Tarefas",
             font=("Arial", 9, "bold"),
             bg="#f9f9f9",
         )
-        lbl_sec_tarefas.pack(anchor="w", padx=5, pady=(2, 2))
+        lbl_sec_tarefas.pack(anchor="w", padx=2, pady=(2, 2))
 
         sorted_keys = sorted(tarefas_dict.keys(), key=chave_ordenacao_y)
         for t_id in sorted_keys:
@@ -280,8 +331,8 @@ class GerenciadorGrafico:
             cor_hex = getattr(task, "cor", "2196F3")
             cor = f"#{cor_hex}" if not str(cor_hex).startswith("#") else cor_hex
 
-            item_frame = tk.Frame(self.frame_legenda, bg="#f9f9f9")
-            item_frame.pack(fill=tk.X, padx=5, pady=1)
+            item_frame = tk.Frame(self.frame_sub_legenda, bg="#f9f9f9")
+            item_frame.pack(fill=tk.X, padx=2, pady=1)
 
             box_cor = tk.Label(
                 item_frame, bg=cor, width=2, height=1, relief="solid", bd=1
@@ -296,17 +347,17 @@ class GerenciadorGrafico:
             )
             lbl_id.pack(side=tk.LEFT)
 
-        ttk.Separator(self.frame_legenda, orient="horizontal").pack(
-            fill=tk.X, padx=5, pady=4
+        ttk.Separator(self.frame_sub_legenda, orient="horizontal").pack(
+            fill=tk.X, padx=2, pady=4
         )
 
         lbl_sec_eventos = tk.Label(
-            self.frame_legenda,
+            self.frame_sub_legenda,
             text="Legenda Gráfica",
             font=("Arial", 9, "bold"),
             bg="#f9f9f9",
         )
-        lbl_sec_eventos.pack(anchor="w", padx=5, pady=(2, 2))
+        lbl_sec_eventos.pack(anchor="w", padx=2, pady=(2, 2))
 
         icones = [
             ("↓", "green", "Chegada"),
@@ -319,8 +370,8 @@ class GerenciadorGrafico:
         ]
 
         for sim, cor, desc in icones:
-            item_frame = tk.Frame(self.frame_legenda, bg="#f9f9f9")
-            item_frame.pack(fill=tk.X, padx=5, pady=1)
+            item_frame = tk.Frame(self.frame_sub_legenda, bg="#f9f9f9")
+            item_frame.pack(fill=tk.X, padx=2, pady=1)
 
             lbl_sym = tk.Label(
                 item_frame,
@@ -520,7 +571,7 @@ class GerenciadorGrafico:
             width=10,
             state="readonly",
         )
-        cb_estado.set(val_atuais[8])
+        cb_estado.set(val_atuais[9])  # Estado atualizado na coluna 9 devido à nova coluna
         cb_estado.grid(row=2, column=1, pady=2)
 
         def salvar():

@@ -21,14 +21,27 @@ def extrair_estado_para_gui(simulador):
                     if t_tick in gantt_history:
                         gantt_history[t_tick][ev.cpu_id] = str(t.id)
 
-    class EstadoGUI:
+    # Recolhe o conteúdo da fila de prontos (IDs das tarefas)
+    fila_prontos_ids = [str(t.id) for t in simulador.fila_prontos]
 
-        def __init__(self, tick, algoritmo, cpus, tarefas, gantt_history):
+    # Recolhe o estado detalhado de cada CPU
+    cpus_estado = []
+    for cpu in simulador.processadores:
+        cpus_estado.append({
+            "id": cpu.id,
+            "tarefa_atual": str(cpu.tarefa_atual.id) if cpu.tarefa_atual else None,
+            "tempo_desligado": getattr(cpu, "tempo_desligado_acumulado", 0)
+        })
+
+    class EstadoGUI:
+        def __init__(self, tick, algoritmo, cpus, tarefas, gantt_history, fila_prontos, cpus_estado):
             self.tick = tick
             self.algoritmo = algoritmo
             self.cpus = cpus
             self.tarefas = tarefas
             self.gantt_history = gantt_history
+            self.fila_prontos = fila_prontos
+            self.cpus_estado = cpus_estado
 
     nome_politica = getattr(simulador.escalonador, "nome_politica", "RM")
 
@@ -38,12 +51,14 @@ def extrair_estado_para_gui(simulador):
         len(simulador.processadores),
         dict_tarefas,
         gantt_history,
+        fila_prontos_ids,
+        cpus_estado,
     )
 
 
 def main():
     gui = GerenciadorGrafico(
-        titulo="Simulador SO - Visualizador", largura=1100, altura=700
+        titulo="Simulador SO - Visualizador", largura=1200, altura=750
     )
     simulador_container = {"instance": None}
 
@@ -51,14 +66,6 @@ def main():
         print(f"[DEBUG] Lendo arquivo: {caminho}")
         configuracao = LeitorConfiguracao()
         configuracao.ler(caminho)
-
-        print(f"[DEBUG] Algoritmo lido: {configuracao.escalonador}")
-        print(f"[DEBUG] Num CPUs: {configuracao.num_cpus}")
-        print(f"[DEBUG] Total de tarefas lidas: {len(configuracao.tarefas)}")
-        for t in configuracao.tarefas:
-            print(
-                f"   -> Tarefa ID={t.id} | Duracao={t.duracao} | Periodo={t.periodo}"
-            )
 
         if configuracao.erros:
             msg_erro = "\n".join(configuracao.erros)
@@ -101,7 +108,6 @@ def main():
         else:
             gui.paresar_animacao()
             
-            # Abre automaticamente a janela interativa para salvar o SVG ao terminar a simulação
             gui.ultimo_estado = extrair_estado_para_gui(sim)
             gui._acao_exportar_svg()
 
