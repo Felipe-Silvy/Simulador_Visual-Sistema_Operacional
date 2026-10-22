@@ -1,13 +1,22 @@
 import os
+import re
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 
+def chave_ordenacao_y(x):
+    """Ordena numericamente usando int(x) (Req. 2.5)."""
+    try:
+        return int(x)
+    except (ValueError, TypeError):
+        return 0
+
+
 class GerenciadorGrafico:
-    """Gerenciador gráfico do Simulador de SO com execução em alta velocidade e exportação SVG."""
+    """Gerenciador gráfico do Simulador de SO com ordenação numérica, legenda completa e exportação SVG rica."""
 
     def __init__(
-        self, titulo="Simulador de SO - Dashboard", largura=1100, altura=700
+        self, titulo="Simulador de SO - Dashboard", largura=1150, altura=750
     ):
         self.root = tk.Tk()
         self.root.title(titulo)
@@ -113,7 +122,7 @@ class GerenciadorGrafico:
         self.canvas_gantt.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         self.frame_legenda = tk.LabelFrame(
-            self.frame_corpo, text="Legenda", bg="#f9f9f9", width=120
+            self.frame_corpo, text="Legenda", bg="#f9f9f9", width=160
         )
         self.frame_legenda.pack(side=tk.RIGHT, fill=tk.Y, padx=(5, 0))
 
@@ -213,7 +222,9 @@ class GerenciadorGrafico:
         for item in self.tabela_tcb.get_children():
             self.tabela_tcb.delete(item)
 
-        for t_id, t in tarefas.items():
+        sorted_keys = sorted(tarefas.keys(), key=chave_ordenacao_y)
+        for t_id in sorted_keys:
+            t = tarefas[t_id]
             ingresso = getattr(t, "ingresso", 0)
             duracao = getattr(t, "duracao", "-")
             periodo = getattr(t, "periodo", "-")
@@ -223,16 +234,26 @@ class GerenciadorGrafico:
             self.tabela_tcb.insert(
                 "",
                 tk.END,
-                values=(t_id, ingresso, duracao, periodo, prazo, estado),
+                values=(str(t_id), ingresso, duracao, periodo, prazo, estado),
             )
 
     def atualizar_legenda(self, tarefas: dict):
         for widget in self.frame_legenda.winfo_children():
             widget.destroy()
 
-        for t_id, task in tarefas.items():
+        lbl_sec_tarefas = tk.Label(
+            self.frame_legenda,
+            text="Tarefas",
+            font=("Arial", 9, "bold"),
+            bg="#f9f9f9",
+        )
+        lbl_sec_tarefas.pack(anchor="w", padx=5, pady=(5, 2))
+
+        sorted_keys = sorted(tarefas.keys(), key=chave_ordenacao_y)
+        for t_id in sorted_keys:
+            task = tarefas[t_id]
             cor_hex = getattr(task, "cor", "2196F3")
-            cor = f"#{cor_hex}" if not cor_hex.startswith("#") else cor_hex
+            cor = f"#{cor_hex}" if not str(cor_hex).startswith("#") else cor_hex
 
             item_frame = tk.Frame(self.frame_legenda, bg="#f9f9f9")
             item_frame.pack(fill=tk.X, padx=5, pady=2)
@@ -250,6 +271,46 @@ class GerenciadorGrafico:
             )
             lbl_id.pack(side=tk.LEFT)
 
+        ttk.Separator(self.frame_legenda, orient="horizontal").pack(
+            fill=tk.X, padx=5, pady=6
+        )
+
+        lbl_sec_eventos = tk.Label(
+            self.frame_legenda,
+            text="Legenda Gráfica",
+            font=("Arial", 9, "bold"),
+            bg="#f9f9f9",
+        )
+        lbl_sec_eventos.pack(anchor="w", padx=5, pady=(2, 2))
+
+        icones = [
+            ("↓", "green", "Chegada"),
+            ("↑", "blue", "Conclusão"),
+            ("✕", "red", "Deadline Miss"),
+            ("S", "purple", "Sorteio"),
+            ("■", "#cccccc", "CPU Desligada"),
+            ("...", "black", "Tarefa Suspensa"),
+        ]
+
+        for sim, cor, desc in icones:
+            item_frame = tk.Frame(self.frame_legenda, bg="#f9f9f9")
+            item_frame.pack(fill=tk.X, padx=5, pady=1)
+
+            lbl_sym = tk.Label(
+                item_frame,
+                text=sim,
+                fg=cor,
+                bg="#f9f9f9",
+                font=("Arial", 10, "bold"),
+                width=2,
+            )
+            lbl_sym.pack(side=tk.LEFT, padx=(0, 2))
+
+            lbl_txt = tk.Label(
+                item_frame, text=desc, bg="#f9f9f9", font=("Arial", 8)
+            )
+            lbl_txt.pack(side=tk.LEFT)
+
     def desenhar_gantt(self, gantt_history: dict, tarefas: dict, total_cpus=1):
         self.canvas_gantt.delete("all")
         if not tarefas:
@@ -260,8 +321,9 @@ class GerenciadorGrafico:
         margin_x = 75
         margin_y = 45
 
+        # Ordenação numérica correta no eixo Y (Req. 2.5) com key=lambda x: int(x)
         sorted_task_ids = sorted(
-            list(tarefas.keys()), key=lambda x: str(x), reverse=True
+            [str(k) for k in tarefas.keys()], key=chave_ordenacao_y
         )
 
         for idx, task_id in enumerate(sorted_task_ids):
@@ -305,13 +367,19 @@ class GerenciadorGrafico:
                     cor_hex = getattr(task, "cor", "2196F3")
                     cor = (
                         f"#{cor_hex}"
-                        if not cor_hex.startswith("#")
-                        else cor_hex
+                        if not str(cor_hex).startswith("#")
+                        else str(cor_hex)
                     )
 
-                    self.canvas_gantt.create_rectangle(
-                        x0, y0, x1, y1, fill=cor, outline="black"
-                    )
+                    estado_t = getattr(task, "estado", "")
+                    if estado_t == "SUSPENSA":
+                        self.canvas_gantt.create_rectangle(
+                            x0, y0, x1, y1, fill="#222222", outline="black", dash=(2, 2)
+                        )
+                    else:
+                        self.canvas_gantt.create_rectangle(
+                            x0, y0, x1, y1, fill=cor, outline="black"
+                        )
 
                     if total_cpus > 1:
                         self.canvas_gantt.create_text(
@@ -322,9 +390,10 @@ class GerenciadorGrafico:
                             font=("Arial", 7, "bold"),
                         )
 
+            # Desenho dos eventos alinhados ao x0 exacto
             for task_id in sorted_task_ids:
                 task = tarefas[task_id]
-                y_idx = sorted_task_ids.index(task_id)
+                y_idx = sorted_task_ids.index(str(task_id))
                 y0 = margin_y + (y_idx * cell_h) + 3
                 y1 = y0 + cell_h - 6
 
@@ -333,29 +402,37 @@ class GerenciadorGrafico:
                         if ev.tipo == "CHEGADA":
                             self.canvas_gantt.create_text(
                                 x0 + 4,
-                                y1 + 4,
-                                text="↑",
+                                y0 - 6,
+                                text="↓",
                                 fill="green",
                                 font=("Arial", 10, "bold"),
                             )
                         elif ev.tipo == "FIM":
                             self.canvas_gantt.create_text(
-                                x1 - 4,
-                                y0 + 4,
-                                text="✓",
+                                x0 + 4,
+                                y1 + 6,
+                                text="↑",
                                 fill="blue",
-                                font=("Arial", 8, "bold"),
+                                font=("Arial", 10, "bold"),
                             )
                         elif ev.tipo == "DEADLINE_MISS":
                             self.canvas_gantt.create_line(
-                                x1, y0 - 2, x1, y1 + 2, fill="red", width=2
+                                x0, y0 - 2, x0, y1 + 2, fill="red", width=2
                             )
                             self.canvas_gantt.create_text(
-                                x1,
+                                x0,
                                 y0 - 8,
                                 text="✕",
                                 fill="red",
                                 font=("Arial", 10, "bold"),
+                            )
+                        elif ev.tipo == "SORTEIO":
+                            self.canvas_gantt.create_text(
+                                x0 + (cell_w / 2),
+                                y0 + 12,
+                                text="S",
+                                fill="purple",
+                                font=("Arial", 9, "bold"),
                             )
 
         max_x = margin_x + (len(gantt_history) * cell_w) + 100
@@ -404,7 +481,7 @@ class GerenciadorGrafico:
         )
         cb_estado = ttk.Combobox(
             frame_form,
-            values=["AGUARDANDO", "PRONTA", "EXECUTANDO", "TERMINADA"],
+            values=["AGUARDANDO", "PRONTA", "EXECUTANDO", "SUSPENSA", "TERMINADA"],
             width=10,
             state="readonly",
         )
@@ -462,21 +539,23 @@ class GerenciadorGrafico:
 
         tarefas_norm = {str(k): v for k, v in tarefas.items()}
         sorted_task_ids = sorted(
-            list(tarefas_norm.keys()), key=lambda x: str(x), reverse=True
+            list(tarefas_norm.keys()), key=chave_ordenacao_y
         )
         num_ticks = max(len(gantt_history), 1)
 
-        width = margin_x + (num_ticks * cell_w) + 120
-        height = margin_y + (len(sorted_task_ids) * cell_h) + 80
+        width = margin_x + (num_ticks * cell_w) + 140
+        height = (
+            margin_y + (len(sorted_task_ids) * cell_h) + 140
+        )  # Espaço extra para a legenda no SVG
 
         svg = [
             f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
             f'  <rect width="{width}" height="{height}" fill="#ffffff" />',
-            '  <!-- Titulo -->',
-            '  <text x="20" y="30" font-size="16" font-weight="bold" fill="#000000" font-family="sans-serif">Grafico de Gantt - Simulador SO</text>',
+            '  <!-- Título -->',
+            '  <text x="20" y="30" font-size="16" font-weight="bold" fill="#000000" font-family="sans-serif">Gráfico de Gantt - Simulador SO</text>',
         ]
 
-        # 1. Rótulos Eixo Y
+        # 1. Rótulos Eixo Y (Ordenados numericamente)
         for idx, task_id in enumerate(sorted_task_ids):
             y_pos = margin_y + (idx * cell_h)
             svg.append(
@@ -519,9 +598,15 @@ class GerenciadorGrafico:
                             else str(cor_hex)
                         )
 
-                        svg.append(
-                            f'  <rect x="{x0}" y="{y0}" width="{cell_w}" height="{cell_h - 8}" fill="{cor}" stroke="#000000" stroke-width="1" />'
-                        )
+                        estado_t = getattr(task, "estado", "")
+                        if estado_t == "SUSPENSA":
+                            svg.append(
+                                f'  <rect x="{x0}" y="{y0}" width="{cell_w}" height="{cell_h - 8}" fill="#222222" stroke="#000000" stroke-dasharray="3,3" stroke-width="1" />'
+                            )
+                        else:
+                            svg.append(
+                                f'  <rect x="{x0}" y="{y0}" width="{cell_w}" height="{cell_h - 8}" fill="{cor}" stroke="#000000" stroke-width="1" />'
+                            )
 
                         if total_cpus > 1:
                             svg.append(
@@ -542,19 +627,35 @@ class GerenciadorGrafico:
                     if ev.tempo_inicio == tick:
                         if ev.tipo == "CHEGADA":
                             svg.append(
-                                f'  <path d="M{x0+5} {y1+14} L{x0+5} {y1+2} M{x0+2} {y1+6} L{x0+5} {y1+2} L{x0+8} {y1+6}" stroke="#008000" stroke-width="2" fill="none" />'
+                                f'  <path d="M{x0+5} {y0-12} L{x0+5} {y0-2} M{x0+2} {y0-6} L{x0+5} {y0-2} L{x0+8} {y0-6}" stroke="#008000" stroke-width="2" fill="none" />'
                             )
                         elif ev.tipo == "FIM":
                             svg.append(
-                                f'  <path d="M{x1-10} {y0-6} L{x1-6} {y0-2} L{x1-1} {y0-9}" stroke="#0000FF" stroke-width="2" fill="none" />'
+                                f'  <path d="M{x0+5} {y1+12} L{x0+5} {y1+2} M{x0+2} {y1+6} L{x0+5} {y1+2} L{x0+8} {y1+6}" stroke="#0000FF" stroke-width="2" fill="none" />'
                             )
                         elif ev.tipo == "DEADLINE_MISS":
                             svg.append(
-                                f'  <line x1="{x1}" y1="{y0 - 4}" x2="{x1}" y2="{y1 + 4}" stroke="#FF0000" stroke-width="2" />'
+                                f'  <line x1="{x0}" y1="{y0 - 4}" x2="{x0}" y2="{y1 + 4}" stroke="#FF0000" stroke-width="2" />'
                             )
                             svg.append(
-                                f'  <path d="M{x1-4} {y0-8} L{x1+4} {y0-2} M{x1+4} {y0-8} L{x1-4} {y0-2}" stroke="#FF0000" stroke-width="2" fill="none" />'
+                                f'  <path d="M{x0-4} {y0-8} L{x0+4} {y0-2} M{x0+4} {y0-8} L{x0-4} {y0-2}" stroke="#FF0000" stroke-width="2" fill="none" />'
                             )
+                        elif ev.tipo == "SORTEIO":
+                            svg.append(
+                                f'  <text x="{x0 + (cell_w / 2)}" y="{y0 + 14}" font-size="10" font-weight="bold" fill="purple" font-family="sans-serif" text-anchor="middle">S</text>'
+                            )
+
+        # Bloco de Legenda Integrado no SVG
+        legenda_y = margin_y + (len(sorted_task_ids) * cell_h) + 30
+        svg.append(f'  <g transform="translate({margin_x}, {legenda_y})">')
+        svg.append(f'    <rect width="450" height="60" fill="#f9f9f9" stroke="#cccccc" rx="5"/>')
+        svg.append(f'    <text x="15" y="20" font-size="12" font-weight="bold" fill="#000" font-family="sans-serif">Legenda de Eventos:</text>')
+        svg.append(f'    <text x="15" y="42" font-size="11" fill="green" font-family="sans-serif">↓ Chegada</text>')
+        svg.append(f'    <text x="95" y="42" font-size="11" fill="blue" font-family="sans-serif">↑ Conclusão</text>')
+        svg.append(f'    <text x="180" y="42" font-size="11" fill="red" font-family="sans-serif">✕ Deadline Miss</text>')
+        svg.append(f'    <text x="290" y="42" font-size="11" fill="purple" font-family="sans-serif">S: Sorteio</text>')
+        svg.append(f'    <text x="365" y="42" font-size="11" fill="#444" font-family="sans-serif">... Suspensa</text>')
+        svg.append(f'  </g>')
 
         svg.append("</svg>")
 
@@ -562,7 +663,7 @@ class GerenciadorGrafico:
             f.write("\n".join(svg))
 
         self.criar_mensagem_aviso(
-            f"Gráfico exportado em SVG:\n{caminho_arquivo}"
+            f"Gráfico e legenda exportados com sucesso em SVG:\n{caminho_arquivo}"
         )
 
     def criar_mensagem_erro(self, mensagem: str) -> None:
