@@ -1,4 +1,5 @@
 from tcb import TCB
+from escalonador import ESCALONADORES
 
 class LeitorConfiguracao:
     # Construtor: executado ao criar um objeto
@@ -50,7 +51,7 @@ class LeitorConfiguracao:
             return
 
         algoritmo = campos[0].strip().upper()
-        if algoritmo not in ("RM", "EDF"): # Adicionar aqui todos os algoritmos que iremos usar no simulador (que irão virar classes)
+        if algoritmo not in ESCALONADORES:
             self.erros.append(f"Linha 1: algoritmo '{algoritmo}' desconhecido (use RM ou EDF).")
         else:
             self.escalonador = algoritmo
