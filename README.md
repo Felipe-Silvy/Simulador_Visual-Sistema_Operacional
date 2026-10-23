@@ -7,12 +7,14 @@ Simulador interativo de escalonamento de tarefas periódicas em sistemas operaci
 ![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
 ![GUI](https://img.shields.io/badge/GUI-Tkinter-informational)
 ![Dependencies](https://img.shields.io/badge/depend%C3%AAncias-nenhuma-success)
+![License](https://img.shields.io/badge/licen%C3%A7a-MIT-green)
 
 ---
 
 ## Sumário
 
 - [Funcionalidades](#funcionalidades)
+- [Capturas de tela](#capturas-de-tela)
 - [Pré-requisitos](#pré-requisitos)
 - [Como executar](#como-executar)
 - [Formato do arquivo de entrada](#formato-do-arquivo-de-entrada)
@@ -31,13 +33,37 @@ Simulador interativo de escalonamento de tarefas periódicas em sistemas operaci
 
 - **Escalonamento preemptivo** com os algoritmos **RM** (prioridade fixa) e **EDF** (prioridade dinâmica).
 - **Multiprocessamento**: número configurável de CPUs, com registro do tempo em que cada CPU ficou desligada (ociosa).
-- **Desempate determinístico** em cinco níveis, com **sorteio** registrado visualmente quando o empate persiste.
+- **Desempate em cinco níveis**, com **sorteio** registrado visualmente quando o empate persiste.
 - **Gráfico de Gantt** em tempo real, com marcadores de chegada, término de execução e perda de deadline.
 - **Viagem no tempo**: avançar, retroceder e reproduzir (Play) sem recalcular o que já foi simulado.
 - **Edição retroativa**: altere duração, prazo ou estado de uma tarefa e a simulação continua a partir dali (ramificação da linha do tempo).
 - **Troca dinâmica de algoritmo** (RM ⇄ EDF) durante a simulação.
 - **Exportação do Gantt em SVG**, inclusive de forma automática ao fim da simulação.
 - **Validação do arquivo de entrada** com mensagens de erro e aviso claras.
+- **Painel de depuração** com a fila de prontos e o estado de cada CPU em tempo real (executando ou ociosa/desligada).
+- **Bloco de Controle de Tarefas (TCB)** detalhado: tempo restante, instâncias concluídas, número de misses, CPU alocada e estado.
+
+---
+
+## Capturas de tela
+
+### Execução passo a passo
+
+Acompanhe a simulação tick a tick: o Gantt é construído a cada avanço, com marcadores de eventos. O painel lateral exibe a fila de prontos e o estado de cada CPU, e a tabela inferior mostra os dados de cada tarefa em tempo real.
+
+![Execução passo a passo da simulação](assets/execucao_passo.png)
+
+### Alteração de tarefas durante a execução
+
+Com um duplo clique na tabela de tarefas, é possível editar duração, deadline e estado de uma tarefa. A simulação continua a partir do ponto alterado.
+
+![Janela de edição de uma tarefa durante a simulação](assets/alteracao_estados.png)
+
+### Gráfico de Gantt exportado
+
+Ao final, o gráfico completo pode ser exportado em SVG, com a legenda de eventos incluída.
+
+![Gráfico de Gantt exportado em SVG](assets/gantt.png)
 
 ---
 
@@ -60,8 +86,8 @@ sudo apt install python3-tk
 
 ```bash
 # 1. Clone o repositório
-git clone https://github.com/<seu-usuario>/<seu-repositorio>.git
-cd <seu-repositorio>
+git clone https://github.com/Felipe-Silvy/Simulador_Visual-Sistema_Operacional.git
+cd Simulador_Visual-Sistema_Operacional
 
 # 2. Execute
 python main.py
@@ -87,18 +113,18 @@ algoritmo;quantum;qtde_cpus
 id;cor;ingresso;duracao;periodo;prazo[;lista_eventos]
 ```
 
-| Campo | Descrição | Regra |
-|---|---|---|
-| `algoritmo` | Política de escalonamento | `RM` ou `EDF` |
-| `quantum` | Quantum de tempo | inteiro ≥ 1 |
-| `qtde_cpus` | Número de processadores | inteiro ≥ 1 |
-| `id` | Identificador da tarefa | inteiro, único |
-| `cor` | Cor da tarefa no Gantt | 6 dígitos hexadecimais (ex.: `FF0000`) |
-| `ingresso` | Instante da primeira ativação | inteiro ≥ 0 |
-| `duracao` | Tempo de CPU por instância | inteiro ≥ 1 |
-| `periodo` | Intervalo entre ativações | inteiro ≥ 1 |
-| `prazo` | Deadline relativo à ativação | inteiro ≥ 1 |
-| `lista_eventos` | Reservado (opcional) | ignorado no Projeto A |
+| Campo           | Descrição                     | Regra                                  |
+| --------------- | ----------------------------- | -------------------------------------- |
+| `algoritmo`     | Política de escalonamento     | `RM` ou `EDF`                          |
+| `quantum`       | Quantum de tempo              | inteiro ≥ 1                            |
+| `qtde_cpus`     | Número de processadores       | inteiro ≥ 1                            |
+| `id`            | Identificador da tarefa       | inteiro, único                         |
+| `cor`           | Cor da tarefa no Gantt        | 6 dígitos hexadecimais (ex.: `FF0000`) |
+| `ingresso`      | Instante da primeira ativação | inteiro ≥ 0                            |
+| `duracao`       | Tempo de CPU por instância    | inteiro ≥ 1                            |
+| `periodo`       | Intervalo entre ativações     | inteiro ≥ 1                            |
+| `prazo`         | Deadline relativo à ativação  | inteiro ≥ 1                            |
+| `lista_eventos` | Reservado (opcional)          | ignorado no Projeto A                  |
 
 ### Exemplo
 
@@ -113,38 +139,42 @@ Duas CPUs, algoritmo EDF e três tarefas periódicas.
 
 ### Validações
 
-| Situação | Resultado |
-|---|---|
-| Arquivo com menos de 2 linhas | Erro |
-| Algoritmo desconhecido | Erro |
-| Quantum ou CPUs inválidos | Erro |
-| Campos faltando ou não numéricos | Erro |
-| Cor fora do padrão hexadecimal | Erro |
-| ID repetido | Erro |
-| Período negativo | Erro |
+| Situação                          | Resultado                                                     |
+| --------------------------------- | ------------------------------------------------------------- |
+| Arquivo com menos de 2 linhas     | Erro                                                          |
+| Algoritmo desconhecido            | Erro                                                          |
+| Quantum ou CPUs inválidos         | Erro                                                          |
+| Campos faltando ou não numéricos  | Erro                                                          |
+| Cor fora do padrão hexadecimal    | Erro                                                          |
+| ID repetido                       | Erro                                                          |
+| Período negativo                  | Erro                                                          |
 | `periodo = 0` (tarefa aperiódica) | Aviso: tarefa ignorada (o Projeto A aceita apenas periódicas) |
 
 ---
 
 ## Como usar a interface
 
-| Controle | Função |
-|---|---|
-| **Abrir Ficheiro** | Carrega e valida o arquivo de configuração e reinicia a simulação |
-| **Avançar** | Executa um tick (ou refaz um tick já calculado) |
-| **Retroceder** | Volta ao tick anterior |
-| **Play / Pausa** | Avança automaticamente até o fim ou até pausar |
-| **Exportar SVG** | Salva o Gantt atual como imagem vetorial |
-| **Duplo clique na tabela de tarefas** | Edita duração, prazo e estado da tarefa |
+| Controle                              | Função                                                            |
+| ------------------------------------- | ----------------------------------------------------------------- |
+| **Abrir Ficheiro**                    | Carrega e valida o arquivo de configuração e reinicia a simulação |
+| **Avançar**                           | Executa um tick (ou refaz um tick já calculado)                   |
+| **Retroceder**                        | Volta ao tick anterior                                            |
+| **Play / Pausa**                      | Avança automaticamente até o fim ou até pausar                    |
+| **Exportar SVG**                      | Salva o Gantt atual como imagem vetorial                          |
+| **Duplo clique na tabela de tarefas** | Edita duração, prazo e estado da tarefa                           |
+| **Seletor de algoritmo**              | Troca entre RM e EDF durante a simulação                          |
 
 ### Legenda do Gantt
 
-| Símbolo | Significado |
-|---|---|
+| Símbolo        | Significado                                                                 |
+| -------------- | --------------------------------------------------------------------------- |
 | Bloco colorido | Tarefa executando (com `C0`, `C1`... indicando a CPU em sistemas multi-CPU) |
-| `↑` verde | Chegada (ativação) de uma instância |
-| `✓` azul | Fim da execução de uma instância |
-| `✕` vermelho | Perda de deadline |
+| `↓` verde      | Chegada (ativação) de uma instância                                         |
+| `↑` azul       | Fim da execução de uma instância                                            |
+| `✕` vermelho   | Perda de deadline                                                           |
+| `↑` laranja    | Ativação ignorada (instância anterior ainda pendente)                       |
+| `S` roxo       | Sorteio no desempate                                                        |
+| `...`          | Tarefa suspensa                                                             |
 
 ---
 
@@ -154,10 +184,10 @@ A cada tick, o escalonador ordena as tarefas candidatas (prontas + em execução
 
 ### Critério principal
 
-| Algoritmo | Chave de prioridade | Tipo |
-|---|---|---|
-| **RM** | Menor `periodo` | Prioridade fixa |
-| **EDF** | Menor `deadline_absoluto` | Prioridade dinâmica |
+| Algoritmo | Chave de prioridade       | Tipo                |
+| --------- | ------------------------- | ------------------- |
+| **RM**    | Menor `periodo`           | Prioridade fixa     |
+| **EDF**   | Menor `deadline_absoluto` | Prioridade dinâmica |
 
 ### Desempates (nesta ordem)
 
@@ -251,13 +281,13 @@ Cada tarefa é simulada por **10 instâncias**; ao concluir a décima, passa a `
 
 ## Autores
 
-- **Nome do integrante 1**: [@usuario](https://github.com/usuario)
-- **Nome do integrante 2**: [@usuario](https://github.com/usuario)
+- **Felipe Domingos Silvy**: [@Felipe-Silvy](https://github.com/Felipe-Silvy)
+- **Pedro Kazuo Asami Goto**: [@pkagoto](https://github.com/pkagoto)
 
-Disciplina de Sistemas Operacionais, <Instituição>, <Semestre/Ano>.
+Disciplina de Sistemas Operacionais, Universidade Tecnológica Federal do Paraná (UTFPR), 4º semestre de Sistemas de Informação (2026.2).
 
 ---
 
 ## Licença
 
-Defina a licença do projeto (por exemplo, [MIT](https://opensource.org/licenses/MIT)) e adicione o arquivo `LICENSE` na raiz do repositório.
+Distribuído sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
